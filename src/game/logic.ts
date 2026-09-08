@@ -1,4 +1,4 @@
-import { COLUMNS, MAX_ROWS, PLANTS, ROW_COSTS, START_ROWS } from "./plants";
+import { COLUMNS, MAX_ROWS, PLANTS, ROW_COSTS, START_ROWS, emptySeeds } from "./plants";
 import type { GameState, PlantId, Plot } from "./types";
 
 /** one full watering lasts 40 seconds */
@@ -13,6 +13,7 @@ export function newGame(): GameState {
     coins: 30,
     rows: START_ROWS,
     plots: Array.from({ length: COLUMNS * MAX_ROWS }, (_, i) => createPlot(i)),
+    seeds: { ...emptySeeds(), grass: 5 },
     totalHarvested: 0,
     totalEarned: 0,
     savedAt: Date.now(),
@@ -61,15 +62,24 @@ export function waterPlot(s: GameState, index: number): GameState {
   return { ...s, plots };
 }
 
+/** Buy one seed from the shop into the stash. */
+export function buySeed(s: GameState, plant: PlantId): { state?: GameState; error?: string } {
+  const def = PLANTS[plant];
+  if (s.coins < def.seedCost) return { error: `金幣不夠，${def.name}種子要 ${def.seedCost}` };
+  return {
+    state: { ...s, coins: s.coins - def.seedCost, seeds: { ...s.seeds, [plant]: (s.seeds[plant] ?? 0) + 1 } },
+  };
+}
+
+/** Plant one seed from the stash onto an empty plot. */
 export function plantSeed(s: GameState, index: number, plant: PlantId): { state?: GameState; error?: string } {
   if (!isUnlocked(s, index)) return { error: "這塊土地還沒解鎖喔" };
   const p = s.plots[index];
   if (p.plant) return { error: "這裡已經種了東西" };
-  const def = PLANTS[plant];
-  if (s.coins < def.seedCost) return { error: `金幣不夠，${def.name}種子要 ${def.seedCost}` };
+  if ((s.seeds[plant] ?? 0) <= 0) return { error: `手上沒有${PLANTS[plant].name}種子` };
   const plots = s.plots.slice();
   plots[index] = { ...p, plant, progress: 0, water: 1 };
-  return { state: { ...s, coins: s.coins - def.seedCost, plots } };
+  return { state: { ...s, plots, seeds: { ...s.seeds, [plant]: s.seeds[plant] - 1 } } };
 }
 
 export function harvest(s: GameState, index: number): { state?: GameState; earned?: number; error?: string } {

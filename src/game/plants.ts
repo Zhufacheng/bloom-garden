@@ -25,3 +25,7 @@ export const PLANT_LIST: PlantDef[] = [
   PLANTS.sunflower,
   PLANTS.rose,
 ];
+
+export function emptySeeds(): Record<PlantId, number> {
+  return { grass: 0, daisy: 0, tulip: 0, sunflower: 0, rose: 0 };
+}

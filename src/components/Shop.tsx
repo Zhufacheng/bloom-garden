@@ -5,13 +5,15 @@ import PlantSprite from "./PlantSprite";
 
 interface Props {
   state: GameState;
-  onPick: (p: PlantId) => void;
+  selected: PlantId | null;
+  onBuy: (p: PlantId) => void;
+  onSelect: (p: PlantId) => void;
   onUnlockRow: () => void;
   onReset: () => void;
   onClose: () => void;
 }
 
-export default function Shop({ state, onPick, onUnlockRow, onReset, onClose }: Props) {
+export default function Shop({ state, selected, onBuy, onSelect, onUnlockRow, onReset, onClose }: Props) {
   return (
     <div className="sheet-overlay" onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
@@ -23,11 +25,15 @@ export default function Shop({ state, onPick, onUnlockRow, onReset, onClose }: P
           </button>
         </div>
 
-        <div className="section-title">植物種子（點一下拿起來，再點空地種下）</div>
+        <div className="section-title">植物種子（可多買，點卡片拿起，再點空地連續種）</div>
         {PLANT_LIST.map((def) => {
-          const afford = state.coins >= def.seedCost;
+          const stock = state.seeds[def.id] ?? 0;
           return (
-            <button key={def.id} className={`shop-item${afford ? "" : " disabled"}`} onClick={() => onPick(def.id)}>
+            <div
+              key={def.id}
+              className={`shop-item${selected === def.id ? " selected" : ""}`}
+              onClick={() => onSelect(def.id)}
+            >
               <span className="icon">
                 <PlantSprite plant={def.id} stage="bloom" />
               </span>
@@ -37,13 +43,19 @@ export default function Shop({ state, onPick, onUnlockRow, onReset, onClose }: P
                 </span>
                 <span className="meta">
                   成熟 {def.growTime} 秒 · 賣出 +{def.sellValue}
+                  {stock > 0 && <b className="stock"> · 庫存 ×{stock}</b>}
                 </span>
               </span>
-              <span className="price">
-                <CoinIcon size={14} />
-                {def.seedCost}
-              </span>
-            </button>
+              <button
+                className="buy-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onBuy(def.id);
+                }}
+              >
+                <CoinIcon size={13} /> {def.seedCost}
+              </button>
+            </div>
           );
         })}
 

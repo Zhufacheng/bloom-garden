@@ -1,24 +1,16 @@
-import { BagIcon, BasketIcon, WaterIcon } from "./Icons";
-
-export type Tool = "water" | "harvest";
+import { BagIcon, WaterIcon } from "./Icons";
 
 interface Props {
-  tool: Tool;
-  hasHand: boolean;
-  onTool: (t: Tool) => void;
+  onWater: () => void;
   onShop: () => void;
 }
 
-export default function Toolbar({ tool, hasHand, onTool, onShop }: Props) {
+export default function Toolbar({ onWater, onShop }: Props) {
   return (
     <nav className="toolbar">
-      <button className={`tool${!hasHand && tool === "water" ? " active" : ""}`} onClick={() => onTool("water")}>
+      <button className="tool active" onClick={onWater}>
         <WaterIcon />
         <span>澆水</span>
-      </button>
-      <button className={`tool${!hasHand && tool === "harvest" ? " active" : ""}`} onClick={() => onTool("harvest")}>
-        <BasketIcon />
-        <span>收獲</span>
       </button>
       <button className="tool" onClick={onShop}>
         <BagIcon />

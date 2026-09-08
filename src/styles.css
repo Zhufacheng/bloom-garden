@@ -419,6 +419,7 @@ button {
   left: 50%;
   transform: translateX(-50%);
   background: #fff;
+  border: none;
   border-radius: 999px;
   padding: 8px 18px 8px 8px;
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.2);
@@ -426,8 +427,12 @@ button {
   gap: 10px;
   align-items: center;
   z-index: 21;
+  font-family: inherit;
   font-size: 13px;
   line-height: 1.35;
+  text-align: left;
+  color: var(--text);
+  cursor: pointer;
   animation: chipIn 0.25s ease-out;
   white-space: nowrap;
 }
@@ -601,13 +606,34 @@ button {
   transform: scale(0.98);
 }
 
-.shop-item.disabled {
-  opacity: 0.55;
-}
-
 .shop-item:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+.shop-item .buy-btn {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  border: none;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  background: linear-gradient(180deg, #ffe082, #ffd54f);
+  color: #5d4037;
+  box-shadow: 0 2px 6px rgba(255, 179, 0, 0.35);
+  transition: transform 0.12s;
+}
+
+.shop-item .buy-btn:active {
+  transform: scale(0.94);
+}
+
+.stock {
+  color: var(--green-700);
 }
 
 .shop-item .icon {

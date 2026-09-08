@@ -24,6 +24,8 @@ export interface GameState {
   /** unlocked rows (grid is always COLUMNS wide) */
   rows: number;
   plots: Plot[];
+  /** seed stash: how many seeds of each plant the player holds */
+  seeds: Record<PlantId, number>;
   totalHarvested: number;
   totalEarned: number;
   /** epoch ms of last save */

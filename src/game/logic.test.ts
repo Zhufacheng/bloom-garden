@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buySeed,
   harvest,
   isUnlocked,
   newGame,
@@ -8,35 +9,76 @@ import {
   unlockNextRow,
   waterPlot,
 } from "./logic";
-import { COLUMNS } from "./plants";
+import { COLUMNS, emptySeeds } from "./plants";
 
 describe("newGame", () => {
-  it("starts with 30 coins, 3x3 unlocked plots, 15 plots total", () => {
+  it("starts with 30 coins, 3x3 unlocked plots, 15 plots total, 5 free grass seeds", () => {
     const s = newGame();
     expect(s.coins).toBe(30);
     expect(s.rows).toBe(3);
     expect(s.plots).toHaveLength(COLUMNS * 5);
     expect(isUnlocked(s, 8)).toBe(true);
     expect(isUnlocked(s, 9)).toBe(false);
+    expect(s.seeds.grass).toBe(5);
+    expect(s.seeds.daisy).toBe(0);
   });
 });
 
-describe("plantSeed", () => {
-  it("plants a seed, deducts coins, starts watered", () => {
-    const s = newGame();
-    const r = plantSeed(s, 0, "daisy");
+describe("buySeed", () => {
+  it("deducts coins and adds to the stash", () => {
+    const s = { ...newGame(), coins: 50 };
+    const r = buySeed(s, "tulip");
     expect(r.error).toBeUndefined();
-    expect(r.state!.coins).toBe(30 - 12);
+    expect(r.state!.coins).toBe(50 - 25);
+    expect(r.state!.seeds.tulip).toBe(1);
+  });
+
+  it("accumulates the stash over multiple buys", () => {
+    let s = { ...newGame(), coins: 100 };
+    s = buySeed(s, "tulip")!.state!;
+    s = buySeed(s, "tulip")!.state!;
+    expect(s.seeds.tulip).toBe(2);
+    expect(s.coins).toBe(100 - 50);
+  });
+
+  it("refuses when coins are short", () => {
+    const r = buySeed({ ...newGame(), coins: 20 }, "tulip");
+    expect(r.error).toBeDefined();
+  });
+});
+
+describe("plantSeed (stash)", () => {
+  it("plants a stash seed, does not touch coins, starts watered", () => {
+    const s = { ...newGame(), coins: 50 };
+    const bought = buySeed(s, "daisy")!.state!;
+    const r = plantSeed(bought, 0, "daisy");
+    expect(r.error).toBeUndefined();
+    expect(r.state!.coins).toBe(50 - 12);
+    expect(r.state!.seeds.daisy).toBe(0);
     expect(r.state!.plots[0].plant).toBe("daisy");
     expect(r.state!.plots[0].progress).toBe(0);
     expect(r.state!.plots[0].water).toBe(1);
   });
 
-  it("fails without enough coins", () => {
-    const s = { ...newGame(), coins: 5 };
-    const r = plantSeed(s, 0, "rose");
+  it("refuses without stash", () => {
+    const r = plantSeed(newGame(), 0, "daisy");
     expect(r.error).toBeDefined();
     expect(r.state).toBeUndefined();
+  });
+
+  it("starter grass seeds can be planted", () => {
+    const r = plantSeed(newGame(), 0, "grass");
+    expect(r.error).toBeUndefined();
+    expect(r.state!.seeds.grass).toBe(4);
+  });
+
+  it("supports rapid sequential planting from the stash", () => {
+    const s = { ...newGame(), coins: 100, seeds: { ...emptySeeds(), tulip: 3 } };
+    let st = plantSeed(s, 0, "tulip")!.state!;
+    st = plantSeed(st, 1, "tulip")!.state!;
+    st = plantSeed(st, 2, "tulip")!.state!;
+    expect(st.seeds.tulip).toBe(0);
+    expect(st.plots.filter((p) => p.plant === "tulip")).toHaveLength(3);
   });
 
   it("fails on an occupied plot", () => {
@@ -67,14 +109,14 @@ describe("stepState growth and water", () => {
   });
 
   it("stops growing when the water runs dry", () => {
-    const s = plantSeed({ ...newGame(), coins: 200 }, 0, "rose")!.state!; // rose: growTime 110s > 40s water
+    const s = plantSeed({ ...newGame(), coins: 200, seeds: { ...emptySeeds(), rose: 1 } }, 0, "rose")!.state!; // rose: growTime 110s > 40s water
     const after = stepState(s, 40);
     expect(after.plots[0].progress).toBeCloseTo(40 / 110, 5);
     expect(after.plots[0].water).toBe(0);
   });
 
   it("resumes after re-watering", () => {
-    let s = plantSeed({ ...newGame(), coins: 200 }, 0, "rose")!.state!;
+    let s = plantSeed({ ...newGame(), coins: 200, seeds: { ...emptySeeds(), rose: 1 } }, 0, "rose")!.state!;
     s = stepState(s, 40); // water runs out
     s = waterPlot(s, 0);
     s = stepState(s, 40); // a full watering lasts exactly 40s again
@@ -110,7 +152,7 @@ describe("harvest", () => {
     s = stepState(s, 20);
     const r = harvest(s, 0);
     expect(r.earned).toBe(12);
-    expect(r.state!.coins).toBe(30 - 5 + 12);
+    expect(r.state!.coins).toBe(30 + 12); // starter grass seed costs nothing
     expect(r.state!.plots[0].plant).toBeNull();
     expect(r.state!.totalHarvested).toBe(1);
     expect(r.state!.totalEarned).toBe(12);

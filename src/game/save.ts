@@ -1,5 +1,6 @@
 import type { DailyState } from "./daily";
 import { newGame, stepState } from "./logic";
+import { emptySeeds } from "./plants";
 import type { GameState } from "./types";
 
 const KEY = "bloom-garden-save-v1";
@@ -30,7 +31,9 @@ export function loadGame(): GameState {
     const parsed = JSON.parse(raw) as GameState;
     const now = Date.now();
     const dt = Math.min(Math.max((now - (parsed.savedAt ?? now)) / 1000, 0), OFFLINE_CAP_SEC);
-    return stepState({ ...parsed, savedAt: now }, dt);
+    // tolerate saves from before the seed stash existed
+    const merged: GameState = { ...newGame(), ...parsed, seeds: { ...emptySeeds(), ...(parsed.seeds ?? {}) } };
+    return stepState({ ...merged, savedAt: now }, dt);
   } catch {
     return newGame();
   }

@@ -4,7 +4,7 @@ import PlantSprite from "./components/PlantSprite";
 import Shop from "./components/Shop";
 import TasksSheet from "./components/TasksSheet";
 import TopBar from "./components/TopBar";
-import Toolbar, { type Tool } from "./components/Toolbar";
+import Toolbar from "./components/Toolbar";
 import {
   advanceDaily,
   claimTask,
@@ -13,7 +13,7 @@ import {
   unclaimedCount,
   type DailyState,
 } from "./game/daily";
-import { harvest, isMature, isUnlocked, plantSeed, stepState, unlockNextRow, waterPlot } from "./game/logic";
+import { buySeed, harvest, isMature, isUnlocked, plantSeed, stepState, unlockNextRow, waterPlot } from "./game/logic";
 import { PLANTS } from "./game/plants";
 import { loadDaily, loadGame, resetGame, saveDaily, saveGame } from "./game/save";
 import type { GameState, PlantId } from "./game/types";
@@ -28,7 +28,6 @@ interface Floater {
 export default function App() {
   const [state, setState] = useState<GameState>(loadGame);
   const [daily, setDaily] = useState<DailyState>(() => ensureDaily(loadDaily(), todayStr()));
-  const [tool, setTool] = useState<Tool>("water");
   const [hand, setHand] = useState<PlantId | null>(null);
   const [shopOpen, setShopOpen] = useState(false);
   const [tasksOpen, setTasksOpen] = useState(false);
@@ -59,6 +58,8 @@ export default function App() {
     toastTimer.current = window.setTimeout(() => setToast(null), 2200);
   }, []);
 
+  const hasHand = hand !== null && (state.seeds[hand] ?? 0) > 0;
+
   const onPlotTap = useCallback(
     (i: number) => {
       if (!isUnlocked(state, i)) {
@@ -74,32 +75,24 @@ export default function App() {
         return;
       }
 
-      if (hand) {
-        const res = plantSeed(state, i, hand);
+      const p = state.plots[i];
+
+      // 成熟 → 直接收獲（不用切工具）
+      if (p.plant && isMature(p)) {
+        const res = harvest(state, i);
         if (res.error) {
-          sfx.error();
           showToast(res.error);
           return;
         }
         setState(res.state!);
-        setDaily((d) => advanceDaily(d, { type: "plant", plants: 1 }));
-        setHand(null);
-        sfx.plant();
-        showToast(`種好了！${PLANTS[hand].name}開始成長 🌱`);
+        setDaily((d) => advanceDaily(advanceDaily(d, { type: "harvest", plants: 1 }), { type: "earn", coins: res.earned! }));
+        sfx.harvest();
+        setFloater({ index: i, amount: res.earned!, key: Date.now() });
         return;
       }
 
-      if (tool === "water") {
-        const p = state.plots[i];
-        if (!p.plant) {
-          sfx.error();
-          showToast("這裡還沒有植物，先去花店拿種子吧");
-          return;
-        }
-        if (isMature(p)) {
-          showToast("已經成熟了，切換「收獲」來採摘！");
-          return;
-        }
+      // 生長中 → 澆水
+      if (p.plant) {
         const next = waterPlot(state, i);
         if (next !== state) {
           setState(next);
@@ -109,38 +102,68 @@ export default function App() {
         return;
       }
 
-      const res = harvest(state, i);
+      // 空地：手持種子就種，沒有就提醒去花店
+      if (!hasHand) {
+        sfx.error();
+        showToast("手上沒有種子，去花店買一點吧");
+        return;
+      }
+      const res = plantSeed(state, i, hand);
       if (res.error) {
         sfx.error();
         showToast(res.error);
         return;
       }
       setState(res.state!);
-      setDaily((d) => advanceDaily(advanceDaily(d, { type: "harvest", plants: 1 }), { type: "earn", coins: res.earned! }));
-      sfx.harvest();
-      setFloater({ index: i, amount: res.earned!, key: Date.now() });
+      setDaily((d) => advanceDaily(d, { type: "plant", plants: 1 }));
+      sfx.plant();
+      const left = res.state!.seeds[hand];
+      if (left <= 0) {
+        setHand(null);
+        showToast(`種好了！${PLANTS[hand].name}開始成長 🌱`);
+      } else {
+        showToast(`種下了！還剩 ${left} 顆種子，繼續點空地`);
+      }
     },
-    [state, tool, hand, showToast]
+    [state, hand, hasHand, showToast]
   );
 
-  const pickSeed = useCallback(
+  const onBuySeed = useCallback(
     (plant: PlantId) => {
-      const def = PLANTS[plant];
-      if (state.coins < def.seedCost) {
+      const res = buySeed(state, plant);
+      if (res.error) {
         sfx.error();
-        showToast(`金幣不夠，${def.name}種子要 ${def.seedCost}`);
+        showToast(res.error);
         return;
       }
-      setState((s) => ({ ...s, coins: s.coins - def.seedCost }));
+      setState(res.state!);
       setHand(plant);
-      setShopOpen(false);
-      sfx.select();
-      showToast(`拿起 ${def.name} 種子，點按空地種下`);
+      sfx.coin();
+      showToast(`買了 1 顆${PLANTS[plant].name}種子（庫存 ×${res.state!.seeds[plant]}）`);
     },
-    [state.coins, showToast]
+    [state, showToast]
   );
 
-  const unlockRowFromShop = useCallback(() => {
+  const onSelectSeed = useCallback(
+    (plant: PlantId) => {
+      if ((state.seeds[plant] ?? 0) <= 0) {
+        sfx.error();
+        showToast(`還沒有${PLANTS[plant].name}種子，先買一點`);
+        return;
+      }
+      setHand(plant);
+      sfx.select();
+    },
+    [state, showToast]
+  );
+
+  const onWaterTap = useCallback(() => {
+    sfx.select();
+    const thirsty = state.plots.some((p) => p.plant && !isMature(p) && p.water < 0.99);
+    showToast(thirsty ? "點一下植物就可以澆水 💧" : "植物水分都很充足 🌿");
+  }, [state, showToast]);
+
+  const onUnlockRow = useCallback(() => {
     const res = unlockNextRow(state);
     if (res.error) {
       sfx.error();
@@ -195,21 +218,23 @@ export default function App() {
         }}
         onToggleSound={toggleSound}
       />
-      <Garden state={state} canPlant={hand !== null} floater={floater} onPlotTap={onPlotTap} />
+      <Garden state={state} canPlant={hasHand} floater={floater} onPlotTap={onPlotTap} />
       {beginnerHint && (
-        <div className="hint">💡 點「花店」買種子 → 點空地種下 → 用「澆水」澆水 → 成熟後用「收獲」採摘</div>
+        <div className="hint">
+          💡 花店買種子（開始送 5 顆青草）→ 點空地種植 → 點植物澆水 → 成熟後直接點它收獲
+        </div>
       )}
-      {hand && (
-        <div className="seed-chip">
+      {hasHand && (
+        <button className="seed-chip" onClick={() => { sfx.select(); setShopOpen(true); }}>
           <span className="seed-chip-icon">
             <PlantSprite plant={hand} stage="bud" />
           </span>
           <span>
-            手持 <b>{PLANTS[hand].name}</b> 種子
+            <b>{PLANTS[hand].name}</b> 種子 ×{state.seeds[hand]}
             <br />
-            <small>點按空地種下</small>
+            <small>點空地連續種植 · 點這裡換種子</small>
           </span>
-        </div>
+        </button>
       )}
       {toast && (
         <div key={toast.key} className="toast">
@@ -219,20 +244,17 @@ export default function App() {
       {shopOpen && (
         <Shop
           state={state}
-          onPick={pickSeed}
-          onUnlockRow={unlockRowFromShop}
+          selected={hasHand ? hand : null}
+          onBuy={onBuySeed}
+          onSelect={onSelectSeed}
+          onUnlockRow={onUnlockRow}
           onReset={onReset}
           onClose={() => setShopOpen(false)}
         />
       )}
       {tasksOpen && <TasksSheet daily={daily} onClaim={onClaimTask} onClose={() => setTasksOpen(false)} />}
       <Toolbar
-        tool={tool}
-        hasHand={hand !== null}
-        onTool={(t) => {
-          sfx.select();
-          setTool(t);
-        }}
+        onWater={onWaterTap}
         onShop={() => {
           sfx.select();
           setShopOpen(true);
