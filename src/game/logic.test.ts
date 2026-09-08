@@ -10,6 +10,7 @@ import {
   waterPlot,
 } from "./logic";
 import { COLUMNS, emptySeeds } from "./plants";
+import { rollWeather, tickWeather } from "./weather";
 
 describe("newGame", () => {
   it("starts with 30 coins, 3x3 unlocked plots, 15 plots total, 5 free grass seeds", () => {
@@ -21,6 +22,73 @@ describe("newGame", () => {
     expect(isUnlocked(s, 9)).toBe(false);
     expect(s.seeds.grass).toBe(5);
     expect(s.seeds.daisy).toBe(0);
+  });
+
+  it("starts sunny with a future weather expiry", () => {
+    const s = newGame();
+    expect(["sunny", "hot", "rain"]).toContain(s.weather);
+    expect(s.weatherUntil).toBeGreaterThan(Date.now());
+  });
+});
+
+describe("weather effects", () => {
+  const withPlant = (weather: "sunny" | "hot" | "rain") =>
+    plantSeed({ ...newGame(), weather, weatherUntil: Date.now() + 60_000 }, 0, "grass")!.state!;
+
+  it("hot weather drains water twice as fast", () => {
+    const after = stepState(withPlant("hot"), 10);
+    expect(after.plots[0].water).toBeCloseTo(0.5, 5);
+  });
+
+  it("rain never drains and refills water", () => {
+    let s = withPlant("rain");
+    s = { ...s, plots: s.plots.map((p, i) => (i === 0 ? { ...p, water: 0.2 } : p)) };
+    const after = stepState(s, 10);
+    expect(after.plots[0].water).toBeCloseTo(0.2 + 10 / 30, 5);
+    expect(after.plots[0].progress).toBeCloseTo(0.5, 5); // grows without any manual watering
+  });
+
+  it("tickWeather keeps the weather before expiry and rerolls after", () => {
+    const s = { ...newGame(), weatherUntil: Date.now() + 60_000 };
+    expect(tickWeather(s, Date.now())).toBe(s);
+    const expired = { ...s, weather: "rain" as const, weatherUntil: Date.now() - 1000 };
+    const after = tickWeather(expired, Date.now());
+    expect(after.weatherUntil).toBeGreaterThan(Date.now());
+    expect(["sunny", "hot", "rain"]).toContain(after.weather);
+  });
+
+  it("rollWeather honors the rng seed", () => {
+    const a = rollWeather(1000, () => 0.1); // < 0.4
+    const b = rollWeather(1000, () => 0.1);
+    expect(a.weather).toBe("sunny");
+    expect(b).toEqual(a);
+    const c = rollWeather(1000, () => 0.5); // 0.4..0.7
+    expect(c.weather).toBe("hot");
+    const d = rollWeather(1000, () => 0.9); // > 0.7
+    expect(d.weather).toBe("rain");
+  });
+});
+
+describe("cactus (noWater)", () => {
+  const cactusState = () =>
+    plantSeed({ ...newGame(), seeds: { ...emptySeeds(), cactus: 1 } }, 0, "cactus")!.state!;
+
+  it("grows to maturity without any water", () => {
+    const after = stepState(cactusState(), 45);
+    expect(after.plots[0].progress).toBe(1);
+    expect(after.plots[0].water).toBe(0);
+  });
+
+  it("ignores hot weather drain", () => {
+    const s = { ...cactusState(), weather: "hot" as const };
+    const after = stepState(s, 20);
+    expect(after.plots[0].water).toBe(0);
+    expect(after.plots[0].progress).toBeCloseTo(20 / 45, 5);
+  });
+
+  it("waterPlot is a no-op", () => {
+    const s = cactusState();
+    expect(waterPlot(s, 0)).toBe(s);
   });
 });
 
@@ -93,30 +161,32 @@ describe("plantSeed (stash)", () => {
   });
 });
 
+const sunny = { weather: "sunny" as const, weatherUntil: Date.now() + 60_000 };
+
 describe("stepState growth and water", () => {
   it("grows at the right rate while water lasts", () => {
-    const s = plantSeed(newGame(), 0, "grass")!.state!; // grass: growTime 20s
+    const s = plantSeed({ ...newGame(), ...sunny }, 0, "grass")!.state!; // grass: growTime 20s
     const after = stepState(s, 10);
     expect(after.plots[0].progress).toBeCloseTo(0.5, 5);
     expect(after.plots[0].water).toBeCloseTo(0.75, 5);
   });
 
   it("blooms before water runs out, keeping the leftover water", () => {
-    const s = plantSeed(newGame(), 0, "grass")!.state!;
+    const s = plantSeed({ ...newGame(), ...sunny }, 0, "grass")!.state!;
     const after = stepState(s, 40);
     expect(after.plots[0].progress).toBe(1);
     expect(after.plots[0].water).toBeCloseTo(0.5, 5); // drained only during 20s of growth
   });
 
   it("stops growing when the water runs dry", () => {
-    const s = plantSeed({ ...newGame(), coins: 200, seeds: { ...emptySeeds(), rose: 1 } }, 0, "rose")!.state!; // rose: growTime 110s > 40s water
+    const s = plantSeed({ ...newGame(), ...sunny, coins: 200, seeds: { ...emptySeeds(), rose: 1 } }, 0, "rose")!.state!; // rose: growTime 110s > 40s water
     const after = stepState(s, 40);
     expect(after.plots[0].progress).toBeCloseTo(40 / 110, 5);
     expect(after.plots[0].water).toBe(0);
   });
 
   it("resumes after re-watering", () => {
-    let s = plantSeed({ ...newGame(), coins: 200, seeds: { ...emptySeeds(), rose: 1 } }, 0, "rose")!.state!;
+    let s = plantSeed({ ...newGame(), ...sunny, coins: 200, seeds: { ...emptySeeds(), rose: 1 } }, 0, "rose")!.state!;
     s = stepState(s, 40); // water runs out
     s = waterPlot(s, 0);
     s = stepState(s, 40); // a full watering lasts exactly 40s again

@@ -1,7 +1,8 @@
 import { COLUMNS, MAX_ROWS, PLANTS, ROW_COSTS, START_ROWS, emptySeeds } from "./plants";
+import { DRAIN_RATES, REFILL_RATES, rollWeather } from "./weather";
 import type { GameState, PlantId, Plot } from "./types";
 
-/** one full watering lasts 40 seconds */
+/** one full watering lasts 40 seconds in sunny weather */
 export const WATER_DRAIN_PER_SEC = 1 / 40;
 
 export function createPlot(id: number): Plot {
@@ -16,6 +17,7 @@ export function newGame(): GameState {
     seeds: { ...emptySeeds(), grass: 5 },
     totalHarvested: 0,
     totalEarned: 0,
+    ...rollWeather(Date.now()),
     savedAt: Date.now(),
   };
 }
@@ -31,24 +33,29 @@ export function isUnlocked(s: GameState, index: number): boolean {
 /**
  * Advance growth for dt seconds. Pure: returns a new state.
  * Growth only progresses while water > 0; water drains only while growing.
- * Analytic (closed-form), so offline catch-up is exact.
+ * Weather drives the drain rate (hot = 2x, rain = 0) and rain refills water.
+ * Analytic (closed-form), so offline catch-up is exact for one weather state.
  */
 export function stepState(s: GameState, dt: number): GameState {
   if (dt <= 0) return s;
+  const rate = DRAIN_RATES[s.weather];
+  const refill = REFILL_RATES[s.weather];
   let changed = false;
   const plots = s.plots.map((p) => {
-    if (!p.plant || p.progress >= 1) return p;
+    if (!p.plant) return p;
     const def = PLANTS[p.plant];
-    const tToBloom = (1 - p.progress) * def.growTime;
-    const tDry = p.water / WATER_DRAIN_PER_SEC;
-    const tGrow = Math.min(dt, tToBloom, tDry);
-    if (tGrow <= 0) return p;
+    let { progress, water } = p;
+    if (progress < 1) {
+      const tToBloom = (1 - progress) * def.growTime;
+      const tDry = def.noWater || rate === 0 ? Infinity : water / rate;
+      const tGrow = Math.min(dt, tToBloom, tDry);
+      progress = Math.min(1, progress + tGrow / def.growTime);
+      if (rate > 0 && !def.noWater) water = Math.max(0, water - tGrow * rate);
+    }
+    if (refill > 0) water = Math.min(1, water + refill * dt);
+    if (progress === p.progress && water === p.water) return p;
     changed = true;
-    return {
-      ...p,
-      progress: Math.min(1, p.progress + tGrow / def.growTime),
-      water: Math.max(0, p.water - tGrow * WATER_DRAIN_PER_SEC),
-    };
+    return { ...p, progress, water };
   });
   if (!changed) return s;
   return { ...s, plots, savedAt: Date.now() };
@@ -56,7 +63,7 @@ export function stepState(s: GameState, dt: number): GameState {
 
 export function waterPlot(s: GameState, index: number): GameState {
   const p = s.plots[index];
-  if (!p.plant || isMature(p)) return s;
+  if (!p.plant || isMature(p) || PLANTS[p.plant].noWater) return s;
   const plots = s.plots.slice();
   plots[index] = { ...p, water: 1 };
   return { ...s, plots };
@@ -76,9 +83,10 @@ export function plantSeed(s: GameState, index: number, plant: PlantId): { state?
   if (!isUnlocked(s, index)) return { error: "這塊土地還沒解鎖喔" };
   const p = s.plots[index];
   if (p.plant) return { error: "這裡已經種了東西" };
-  if ((s.seeds[plant] ?? 0) <= 0) return { error: `手上沒有${PLANTS[plant].name}種子` };
+  const def = PLANTS[plant];
+  if ((s.seeds[plant] ?? 0) <= 0) return { error: `手上沒有${def.name}種子` };
   const plots = s.plots.slice();
-  plots[index] = { ...p, plant, progress: 0, water: 1 };
+  plots[index] = { ...p, plant, progress: 0, water: def.noWater ? 0 : 1 };
   return { state: { ...s, plots, seeds: { ...s.seeds, [plant]: s.seeds[plant] - 1 } } };
 }
 

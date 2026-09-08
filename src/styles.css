@@ -140,26 +140,92 @@ button {
 /* ---------- garden ---------- */
 
 .garden-card {
+  position: relative;
   background: linear-gradient(180deg, #aed581 0%, #9ccc65 100%);
   border-radius: 24px;
   padding: 14px 14px 16px;
   box-shadow: inset 0 2px 12px rgba(255, 255, 255, 0.4), var(--shadow);
+  overflow: hidden;
+  transition: background 1s ease;
+}
+
+/* weather: hot — warm sun glow */
+.garden-card.wx-hot {
+  background: linear-gradient(180deg, #b3c164 0%, #97a852 100%);
+}
+
+.garden-card.wx-hot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 24px;
+  background: radial-gradient(130% 85% at 50% -5%, rgba(255, 183, 77, 0.4), rgba(255, 183, 77, 0.1) 55%, transparent 75%);
+  pointer-events: none;
+  animation: sunPulse 2.6s ease-in-out infinite;
+}
+
+@keyframes sunPulse {
+  50% {
+    opacity: 0.65;
+  }
+}
+
+/* weather: rain — gloomy tone + falling rain */
+.garden-card.wx-rain {
+  background: linear-gradient(180deg, #93a88b 0%, #7c926f 100%);
+}
+
+.garden-card.wx-rain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 24px;
+  background-image: repeating-linear-gradient(
+    100deg,
+    transparent 0 7px,
+    rgba(255, 255, 255, 0.3) 7px 8px,
+    transparent 8px 16px
+  );
+  animation: rainMove 0.55s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes rainMove {
+  to {
+    background-position: -24px 48px;
+  }
 }
 
 .garden-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
+  gap: 6px;
   color: #33691e;
   font-weight: 800;
   font-size: 15px;
   margin: 0 2px 10px;
+  position: relative;
+  z-index: 1;
+}
+
+.weather-chip {
+  flex: none;
+  font-size: 11px;
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.6);
+  color: #37474f;
+  border-radius: 999px;
+  padding: 4px 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  white-space: nowrap;
 }
 
 .garden-sub {
   font-size: 12px;
   font-weight: 700;
   color: rgba(51, 105, 30, 0.65);
+  margin-left: 4px;
 }
 
 .garden-grid {

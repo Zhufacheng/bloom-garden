@@ -17,6 +17,7 @@ import { buySeed, harvest, isMature, isUnlocked, plantSeed, stepState, unlockNex
 import { PLANTS } from "./game/plants";
 import { loadDaily, loadGame, resetGame, saveDaily, saveGame } from "./game/save";
 import type { GameState, PlantId } from "./game/types";
+import { tickWeather } from "./game/weather";
 import { isMuted, setMuted, sfx } from "./sfx";
 
 interface Floater {
@@ -38,7 +39,7 @@ export default function App() {
 
   useEffect(() => {
     const t = window.setInterval(() => {
-      setState((s) => stepState(s, 1));
+      setState((s) => stepState(tickWeather(s, Date.now()), 1));
       setDaily((d) => ensureDaily(d, todayStr()));
     }, 1000);
     return () => window.clearInterval(t);
@@ -91,8 +92,17 @@ export default function App() {
         return;
       }
 
-      // 生長中 → 澆水
+      // 生長中 → 澆水（下雨不用澆、仙人掌不用澆）
       if (p.plant) {
+        if (state.weather === "rain") {
+          showToast("正在下雨，雨水會自動澆花 🌧️");
+          return;
+        }
+        const def = PLANTS[p.plant];
+        if (def.noWater) {
+          showToast(`${def.name}不用澆水 🌵`);
+          return;
+        }
         const next = waterPlot(state, i);
         if (next !== state) {
           setState(next);
@@ -159,7 +169,11 @@ export default function App() {
 
   const onWaterTap = useCallback(() => {
     sfx.select();
-    const thirsty = state.plots.some((p) => p.plant && !isMature(p) && p.water < 0.99);
+    if (state.weather === "rain") {
+      showToast("正在下雨，不用澆水 🌧️");
+      return;
+    }
+    const thirsty = state.plots.some((p) => p.plant && !isMature(p) && !PLANTS[p.plant].noWater && p.water < 0.99);
     showToast(thirsty ? "點一下植物就可以澆水 💧" : "植物水分都很充足 🌿");
   }, [state, showToast]);
 

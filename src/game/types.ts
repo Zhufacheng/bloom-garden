@@ -1,4 +1,6 @@
-export type PlantId = "grass" | "daisy" | "tulip" | "sunflower" | "rose";
+export type PlantId = "grass" | "daisy" | "daffodil" | "tulip" | "cactus" | "sunflower" | "lavender" | "hyacinth" | "rose";
+
+export type WeatherKind = "sunny" | "hot" | "rain";
 
 export interface PlantDef {
   id: PlantId;
@@ -8,6 +10,8 @@ export interface PlantDef {
   /** seconds of growth needed (while watered) */
   growTime: number;
   sellValue: number;
+  /** cactus-like: never needs water */
+  noWater?: boolean;
 }
 
 export interface Plot {
@@ -28,6 +32,9 @@ export interface GameState {
   seeds: Record<PlantId, number>;
   totalHarvested: number;
   totalEarned: number;
+  weather: WeatherKind;
+  /** epoch ms when the current weather changes */
+  weatherUntil: number;
   /** epoch ms of last save */
   savedAt: number;
 }

@@ -2,6 +2,7 @@ import type { DailyState } from "./daily";
 import { newGame, stepState } from "./logic";
 import { emptySeeds } from "./plants";
 import type { GameState } from "./types";
+import { tickWeather } from "./weather";
 
 const KEY = "bloom-garden-save-v1";
 const DAILY_KEY = "bloom-garden-daily-v1";
@@ -31,9 +32,15 @@ export function loadGame(): GameState {
     const parsed = JSON.parse(raw) as GameState;
     const now = Date.now();
     const dt = Math.min(Math.max((now - (parsed.savedAt ?? now)) / 1000, 0), OFFLINE_CAP_SEC);
-    // tolerate saves from before the seed stash existed
-    const merged: GameState = { ...newGame(), ...parsed, seeds: { ...emptySeeds(), ...(parsed.seeds ?? {}) } };
-    return stepState({ ...merged, savedAt: now }, dt);
+    // tolerate saves from before the seed stash / weather existed
+    const merged: GameState = {
+      ...newGame(),
+      ...parsed,
+      seeds: { ...emptySeeds(), ...(parsed.seeds ?? {}) },
+      weather: parsed.weather ?? "sunny",
+      weatherUntil: parsed.weatherUntil ?? now + 180_000,
+    };
+    return tickWeather(stepState({ ...merged, savedAt: now }, dt), now);
   } catch {
     return newGame();
   }

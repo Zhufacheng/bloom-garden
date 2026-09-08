@@ -36,6 +36,7 @@ export default function Plot({ plot, index, locked, lockCost, canPlant, floater,
   }
 
   const mature = isMature(plot);
+  const noWater = plot.plant !== null && PLANTS[plot.plant].noWater;
   const stage = plot.plant ? stageOf(plot.progress) : "seed";
 
   return (
@@ -44,12 +45,12 @@ export default function Plot({ plot, index, locked, lockCost, canPlant, floater,
       onClick={onTap}
       aria-label={plot.plant ? PLANTS[plot.plant].name : `空地 ${index + 1}`}
     >
-      {plot.plant && !mature && (
+      {plot.plant && !mature && !noWater && (
         <span className="waterbar">
           <span style={{ width: `${Math.round(plot.water * 100)}%` }} />
         </span>
       )}
-      {plot.plant && !mature && plot.water < 0.3 && (
+      {plot.plant && !mature && !noWater && plot.water < 0.3 && (
         <span className="droplet">
           <DropIcon />
         </span>

@@ -12,8 +12,12 @@ export function stageOf(progress: number): Stage {
 const BUD_COLORS: Record<PlantId, string> = {
   grass: "#66bb6a",
   daisy: "#fafafa",
+  daffodil: "#ffd54f",
+  cactus: "#81c784",
   tulip: "#f06292",
+  lavender: "#b39ddb",
   sunflower: "#ffc107",
+  hyacinth: "#90caf9",
   rose: "#ec407a",
 };
 
@@ -135,6 +139,94 @@ function SunflowerBloom() {
   );
 }
 
+function DaffodilBloom() {
+  const angles = [0, 60, 120, 180, 240, 300];
+  return (
+    <g>
+      <FlowerStem />
+      {angles.map((a) => (
+        <ellipse
+          key={a}
+          cx="32"
+          cy="15.5"
+          rx="4"
+          ry="8.5"
+          fill="#fff59d"
+          stroke="#fdd835"
+          strokeWidth="0.6"
+          transform={`rotate(${a} 32 25)`}
+        />
+      ))}
+      <circle cx="32" cy="25" r="6" fill="#ffca28" />
+      <circle cx="32" cy="25" r="3.5" fill="#ff9800" />
+    </g>
+  );
+}
+
+function CactusBloom() {
+  return (
+    <g>
+      <ellipse cx="32" cy="56" rx="13" ry="4" fill="rgba(0,0,0,0.15)" />
+      <rect x="15" y="30" width="8" height="15" rx="4" fill="#558b2f" />
+      <rect x="19" y="39" width="8" height="6" rx="3" fill="#558b2f" />
+      <rect x="41" y="26" width="8" height="17" rx="4" fill="#558b2f" />
+      <rect x="36" y="36" width="7" height="6" rx="3" fill="#558b2f" />
+      <rect x="26" y="22" width="12" height="32" rx="6" fill="#66bb6a" />
+      <path
+        d="M28 30l-2.5-1.5M36 34l2.5-1.5M28 42l-2.5-1.5M36 46l2.5-1.5M28 50l-2.5-1.5M36 54l2.5-1.5"
+        stroke="#c8e6c9"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+      />
+      <circle cx="32" cy="19" r="3.5" fill="#f48fb1" />
+      <circle cx="32" cy="19" r="1.5" fill="#fff176" />
+    </g>
+  );
+}
+
+function LavenderBloom() {
+  const buds = [0, 1, 2, 3, 4, 5, 6, 7];
+  return (
+    <g>
+      <FlowerStem />
+      {buds.map((i) => (
+        <circle
+          key={i}
+          cx={i % 2 === 0 ? 29 : 35}
+          cy={28 - i * 2.6}
+          r={i < 5 ? 2.6 : 2}
+          fill={i % 2 === 0 ? "#9575cd" : "#7e57c2"}
+        />
+      ))}
+      <circle cx="32" cy="8" r="2.2" fill="#b39ddb" />
+    </g>
+  );
+}
+
+const HYACINTH_BLOOMS: Array<[number, number]> = [
+  [27, 30],
+  [32, 31],
+  [37, 30],
+  [29, 25.5],
+  [34, 25.5],
+  [37.5, 26],
+  [31, 21],
+  [35.5, 21.5],
+  [32.5, 16.5],
+  [33, 12.5],
+];
+
+function HyacinthBloom() {
+  return (
+    <g>
+      <FlowerStem />
+      {HYACINTH_BLOOMS.map(([x, y], i) => (
+        <circle key={i} cx={x} cy={y} r="3.1" fill={i % 2 === 0 ? "#42a5f5" : "#64b5f5"} />
+      ))}
+    </g>
+  );
+}
+
 function RoseBloom() {
   const outer = [0, 72, 144, 216, 288];
   const inner = [36, 108, 180, 252, 324];
@@ -162,8 +254,12 @@ export default function PlantSprite({ plant, stage, className }: { plant: PlantI
   else if (stage === "bud") content = <Bud color={BUD_COLORS[plant]} />;
   else if (plant === "grass") content = <GrassBloom />;
   else if (plant === "daisy") content = <DaisyBloom />;
+  else if (plant === "daffodil") content = <DaffodilBloom />;
+  else if (plant === "cactus") content = <CactusBloom />;
   else if (plant === "tulip") content = <TulipBloom />;
+  else if (plant === "lavender") content = <LavenderBloom />;
   else if (plant === "sunflower") content = <SunflowerBloom />;
+  else if (plant === "hyacinth") content = <HyacinthBloom />;
   else content = <RoseBloom />;
 
   return (

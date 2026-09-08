@@ -1,4 +1,5 @@
 import { COLUMNS, MAX_ROWS, ROW_COSTS } from "../game/plants";
+import { WEATHER_META } from "../game/weather";
 import type { GameState } from "../game/types";
 import Plot from "./Plot";
 
@@ -18,13 +19,16 @@ interface Props {
 export default function Garden({ state, canPlant, floater, onPlotTap }: Props) {
   const total = COLUMNS * MAX_ROWS;
   const nextRowCost = state.rows < MAX_ROWS ? ROW_COSTS[state.rows + 1] : undefined;
+  const wx = WEATHER_META[state.weather];
 
   return (
-    <div className="garden-card">
+    <div className={`garden-card wx-${state.weather}`}>
       <div className="garden-head">
-        <span>🌻 我的花園</span>
-        <span className="garden-sub">
-          {state.rows}×{COLUMNS}
+        <span>
+          🌻 我的花園 <span className="garden-sub">{state.rows}×{COLUMNS}</span>
+        </span>
+        <span className="weather-chip" title={wx.hint}>
+          {wx.icon} {wx.label} · {wx.hint}
         </span>
       </div>
       <div className="garden-grid">
