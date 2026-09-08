@@ -1,0 +1,17 @@
+{
+  "name": "花花草草 Bloom Garden",
+  "short_name": "花花草草",
+  "description": "養成類小遊戲：種植、澆水、收獲花朵與青草",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f1f8e9",
+  "theme_color": "#66bb6a",
+  "lang": "zh-Hant",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
