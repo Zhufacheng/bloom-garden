@@ -69,6 +69,49 @@ button {
   letter-spacing: 1px;
 }
 
+.top-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.icon-btn {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  border: none;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: var(--shadow);
+  font-size: 17px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.12s;
+}
+
+.icon-btn:active {
+  transform: scale(0.92);
+}
+
+.badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  min-width: 17px;
+  height: 17px;
+  border-radius: 999px;
+  background: #e53950;
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
 .top-right {
   display: flex;
   flex-direction: column;
@@ -647,6 +690,120 @@ button {
 
 .reset-btn:active {
   background: #f1f5f3;
+}
+
+/* ---------- daily tasks ---------- */
+
+.sheet-head h2 small {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-soft);
+  margin-left: 6px;
+}
+
+.task-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #f7faf5;
+  border: 1.5px solid #e3eedd;
+  border-radius: 16px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+
+.task-item.claimed {
+  opacity: 0.65;
+  background: #f2f5f2;
+}
+
+.task-icon {
+  font-size: 20px;
+  flex: none;
+}
+
+.task-item .info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.task-item .name {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.task-item .meta {
+  font-size: 11px;
+  color: var(--text-soft);
+  font-weight: 600;
+}
+
+.task-bar {
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.task-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #aed581, #7cb342);
+  transition: width 0.3s ease;
+}
+
+.claim-btn {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  border: none;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  background: linear-gradient(180deg, #ffe082, #ffd54f);
+  color: #5d4037;
+  box-shadow: 0 2px 6px rgba(255, 179, 0, 0.35);
+  transition: transform 0.12s;
+}
+
+.claim-btn:active {
+  transform: scale(0.94);
+}
+
+.claim-btn:disabled {
+  background: #eceff1;
+  color: #b0bec5;
+  box-shadow: none;
+  cursor: default;
+}
+
+.claim-btn.done {
+  background: #e8f5e9;
+  color: #81c784;
+  box-shadow: none;
+}
+
+.tasks-done {
+  margin-top: 12px;
+  text-align: center;
+  font-weight: 800;
+  color: var(--green-800);
+  font-size: 14px;
+}
+
+.tasks-note {
+  margin-top: 10px;
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--text-soft);
 }
 
 /* ---------- toast ---------- */

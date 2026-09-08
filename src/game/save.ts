@@ -1,8 +1,27 @@
+import type { DailyState } from "./daily";
 import { newGame, stepState } from "./logic";
 import type { GameState } from "./types";
 
 const KEY = "bloom-garden-save-v1";
+const DAILY_KEY = "bloom-garden-daily-v1";
 const OFFLINE_CAP_SEC = 8 * 3600;
+
+export function loadDaily(): DailyState | null {
+  try {
+    const raw = localStorage.getItem(DAILY_KEY);
+    return raw ? (JSON.parse(raw) as DailyState) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveDaily(d: DailyState): void {
+  try {
+    localStorage.setItem(DAILY_KEY, JSON.stringify(d));
+  } catch {
+    // ignore
+  }
+}
 
 export function loadGame(): GameState {
   try {

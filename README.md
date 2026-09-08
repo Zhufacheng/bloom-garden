@@ -19,6 +19,9 @@
 | 向日葵 Sunflower | 45 | 75 秒 | 125 |
 | 玫瑰 Rose | 80 | 110 秒 | 220 |
 
+- **每日任務**：每天 3 個隨機任務（收獲/澆水/賺金幣/種植），完成領金幣，每天 0 點刷新
+- **音效**：種植、澆水、收獲、領獎都有音效（Web Audio 生成，右上角 🔊 可靜音）
+
 進度自動存在手機上（localStorage），離開一段時間再回來，植物也會繼續長大（離線補算最多 8 小時）。
 
 ## 在 iPhone 上安裝
@@ -39,4 +42,16 @@ npm run build    # 型別檢查 + 建置到 dist/
 ## 技術
 
 React + TypeScript + Vite，原生 CSS（手繪 SVG 植物圖形），localStorage 存檔，
-Service Worker 離線快取。部署：GitHub Actions → GitHub Pages。
+Service Worker 離線快取。
+
+## 部署
+
+目前以「本地建置 → 推送 `gh-pages` 分支」的方式部署到 GitHub Pages：
+
+```bash
+npm run build
+# 將 dist/ 內容推送到 gh-pages 分支即可
+```
+
+`.github/workflows/deploy.yml`（GitHub Actions 自動部署）已備妥，
+等 GitHub token 加上 `workflow` scope 後 commit 上去即可啟用。
