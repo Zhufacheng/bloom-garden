@@ -1,5 +1,5 @@
 import { useMemo, useRef } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { stageOf } from "../components/PlantSprite";
 import { isMature } from "../game/logic";
@@ -181,9 +181,24 @@ interface WorldProps {
   canPlant: boolean;
   onPlotTap: (i: number) => void;
   worldRef: React.RefObject<THREE.Group | null>;
+  /** pinch/wheel zoom factor (1 = default framing), mutated by the wrapper */
+  zoomRef: { current: number };
 }
 
-function World({ state, canPlant, onPlotTap, worldRef }: WorldProps) {
+/** keeps the camera aimed at the garden and eases in pinch/wheel zoom */
+function CameraRig({ zoomRef }: { zoomRef: { current: number } }) {
+  const { camera } = useThree();
+  useFrame((_, delta) => {
+    const z = zoomRef.current;
+    camera.position.x = THREE.MathUtils.damp(camera.position.x, 0, 6, delta);
+    camera.position.y = THREE.MathUtils.damp(camera.position.y, 6.6 * z, 6, delta);
+    camera.position.z = THREE.MathUtils.damp(camera.position.z, 7.6 * z, 6, delta);
+    camera.lookAt(0, 0.5, 0);
+  });
+  return null;
+}
+
+function World({ state, canPlant, onPlotTap, worldRef }: Omit<WorldProps, "zoomRef">) {
   const sky = SKY[state.weather];
   const amb = state.weather === "hot" ? 1.0 : state.weather === "rain" ? 0.6 : 0.85;
   const sun = state.weather === "hot" ? 1.5 : state.weather === "rain" ? 0.5 : 1.2;
@@ -225,10 +240,11 @@ function World({ state, canPlant, onPlotTap, worldRef }: WorldProps) {
   );
 }
 
-export default function GardenScene(props: WorldProps) {
+export default function GardenScene({ zoomRef, ...worldProps }: WorldProps) {
   return (
     <Canvas dpr={[1, 2]} camera={{ position: [0, 6.6, 7.6], fov: 42 }}>
-      <World {...props} />
+      <CameraRig zoomRef={zoomRef} />
+      <World {...worldProps} />
     </Canvas>
   );
 }
