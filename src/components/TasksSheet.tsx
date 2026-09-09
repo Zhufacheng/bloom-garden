@@ -1,4 +1,4 @@
-import { allClaimed, todayStr, yesterdayStr, type DailyState } from "../game/daily";
+import { ORDER_CLEAR_BONUS, allClaimed, todayStr, yesterdayStr, type DailyState } from "../game/daily";
 import { CHECKIN_REWARDS, MILESTONES } from "../game/logic";
 import { PLANTS } from "../game/plants";
 import type { GameState } from "../game/types";
@@ -92,10 +92,10 @@ export default function TasksSheet({ daily, game, onClaim, onClaimOrder, onClaim
           const done = o.progress >= o.count;
           return (
             <div key={o.id} className={`task-item${o.claimed ? " claimed" : ""}`}>
-              <span className="task-icon">{o.claimed ? "✅" : done ? "🌟" : "📦"}</span>
+              <span className="task-icon">{o.claimed ? "✅" : done ? "🌟" : o.express ? "⚡" : "📦"}</span>
               <span className="info">
                 <span className="name">
-                  {def.name} ×{o.count} <small>鄰里訂單</small>
+                  {def.name} ×{o.count} <small>鄰里訂單{o.express ? " · ⚡加急 ×2 賞金" : ""}</small>
                 </span>
                 <span className="task-bar">
                   <span style={{ width: `${Math.min(100, (o.progress / o.count) * 100)}%` }} />
@@ -115,7 +115,9 @@ export default function TasksSheet({ daily, game, onClaim, onClaimOrder, onClaim
             </div>
           );
         })}
-        <div className="tasks-note">訂單賞金 = 基準賣價 ×1.5，每天 0 點換新訂單</div>
+        <div className="tasks-note">
+          訂單賞金 = 基準賣價 ×1.5（⚡加急單 ×2），全部完成再領 +{ORDER_CLEAR_BONUS} 金幣；每天 0 點換新訂單
+        </div>
 
         <div className="section-title">成就（一次性獎勵，達成後可領）</div>
         {MILESTONES.map((m) => {

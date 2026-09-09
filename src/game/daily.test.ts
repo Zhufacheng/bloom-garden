@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  ORDER_CLEAR_BONUS,
   advanceDaily,
   advanceOrders,
   allClaimed,
@@ -91,6 +92,7 @@ describe("advanceDaily", () => {
         { id: "earn" as const, desc: "賺取 50 金幣", target: 50, progress: 20, reward: 35, claimed: false },
       ],
       orders: [],
+      orderBonusClaimed: false,
     };
     const after = advanceDaily(state, { type: "earn", coins: 40 });
     expect(after.tasks[0].progress).toBe(50);
@@ -98,20 +100,28 @@ describe("advanceDaily", () => {
 });
 
 describe("orders", () => {
-  it("rolls 2 distinct-plant orders deterministically, paying 1.5x base price", () => {
+  it("rolls 2 distinct-plant orders at 1.5x, sometimes a 3rd express order at 2x", () => {
     const a = rollDaily("2026-09-08");
-    const b = rollDaily("2026-09-08");
-    expect(a.orders).toEqual(b.orders);
-    expect(a.orders).toHaveLength(2);
-    expect(new Set(a.orders.map((o) => o.plant)).size).toBe(2);
+    expect(a.orders).toEqual(rollDaily("2026-09-08").orders);
+    expect(a.orderBonusClaimed).toBe(false);
+    const normal = a.orders.filter((o) => !o.express);
+    expect(normal).toHaveLength(2);
+    expect(new Set(normal.map((o) => o.plant)).size).toBe(2);
+    expect(a.orders.filter((o) => o.express).length).toBeLessThanOrEqual(1);
     for (const o of a.orders) {
       const def = PLANT_LIST.find((p) => p.id === o.plant)!;
-      expect(o.count).toBeGreaterThanOrEqual(2);
-      expect(o.count).toBeLessThanOrEqual(4);
-      expect(o.reward).toBe(Math.round(def.sellValue * o.count * 1.5));
+      const mult = o.express ? 2 : 1.5;
+      expect(o.count).toBeGreaterThanOrEqual(o.express ? 1 : 2);
+      expect(o.count).toBeLessThanOrEqual(o.express ? 2 : 4);
+      expect(o.reward).toBe(Math.round(def.sellValue * o.count * mult));
       expect(o.progress).toBe(0);
       expect(o.claimed).toBe(false);
     }
+    // express orders are a real 25%-ish chance, not a dead code path
+    const someDateHasExpress = Array.from({ length: 30 }, (_, i) => `2026-09-${String(i + 1).padStart(2, "0")}`).some(
+      (d) => rollDaily(d).orders.some((o) => o.express),
+    );
+    expect(someDateHasExpress).toBe(true);
   });
 
   it("advances only the matching unclaimed order", () => {
@@ -143,6 +153,22 @@ describe("orders", () => {
     expect(res!.reward).toBe(o.reward);
     expect(res!.state.orders[1].claimed).toBe(true);
     expect(claimOrder(res!.state, 1)).toBeNull();
+  });
+
+  it("pays the all-orders-clear bonus exactly once", () => {
+    const d = rollDaily("2026-09-08");
+    let cur = d;
+    const bonuses: number[] = [];
+    for (let idx = 0; idx < cur.orders.length; idx++) {
+      const o = cur.orders[idx];
+      for (let i = 0; i < o.count; i++) cur = advanceOrders(cur, o.plant);
+      const res = claimOrder(cur, idx)!;
+      bonuses.push(res.bonus ?? 0);
+      cur = res.state;
+    }
+    expect(bonuses).toHaveLength(d.orders.length);
+    expect(bonuses.reduce((a, b) => a + b, 0)).toBe(ORDER_CLEAR_BONUS);
+    expect(cur.orderBonusClaimed).toBe(true);
   });
 
   it("ensureDaily backfills orders on same-day saves from before orders existed", () => {
@@ -177,6 +203,7 @@ describe("claimTask / unclaimedCount / allClaimed", () => {
         { id: "plant" as const, desc: "", target: 2, progress: 2, reward: 5, claimed: true },
       ],
       orders: [],
+      orderBonusClaimed: false,
     };
     expect(unclaimedCount(state)).toBe(1);
     const res = claimTask(state, 0)!;
@@ -192,6 +219,7 @@ describe("claimTask / unclaimedCount / allClaimed", () => {
         { id: "plant" as const, desc: "", target: 2, progress: 2, reward: 5, claimed: true },
       ],
       orders: [],
+      orderBonusClaimed: false,
     };
     expect(allClaimed(base)).toBe(false);
     expect(allClaimed(claimTask(base, 0)!.state)).toBe(true);

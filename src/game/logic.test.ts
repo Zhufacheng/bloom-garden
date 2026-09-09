@@ -569,9 +569,20 @@ describe("tickEvents", () => {
     expect(r.state.plots[0].boost).toBe(1.75);
   });
 
+  it("shooting star pushes all growing plants +10%, capped at 0.99", () => {
+    let s = due();
+    s = plantSeed(s, 0, "grass")!.state!;
+    s = plantSeed(s, 1, "grass")!.state!;
+    s = { ...s, plots: s.plots.map((p, i) => (i === 0 ? { ...p, progress: 0.5 } : i === 1 ? { ...p, progress: 0.95 } : p)) };
+    const r = tickEvents(s, Date.now(), seq(0.5, 0.5, 0.9)); // delay, event, shooting star band
+    expect(r.msg).toContain("流星");
+    expect(r.state.plots[0].progress).toBeCloseTo(0.6, 5);
+    expect(r.state.plots[1].progress).toBe(0.99); // capped, not matured
+  });
+
   it("rainbow speeds up growth for 60s", () => {
     const s = due();
-    const r = tickEvents(s, Date.now(), seq(0.5, 0.5, 0.9)); // delay, event, rainbow
+    const r = tickEvents(s, Date.now(), seq(0.5, 0.5, 0.96)); // delay, event, rainbow
     expect(r.msg).toContain("彩虹");
     expect(r.state.growthBoostUntil).toBeGreaterThan(Date.now());
   });

@@ -20,12 +20,19 @@ export interface Order {
   reward: number;
   progress: number;
   claimed: boolean;
+  /** rush order: smaller quantity, 2× base-price bounty */
+  express?: boolean;
 }
+
+/** bonus paid once when every order of the day is completed */
+export const ORDER_CLEAR_BONUS = 30;
 
 export interface DailyState {
   date: string; // local YYYY-MM-DD
   tasks: DailyTask[];
   orders: Order[];
+  /** the all-orders-clear bonus has been paid today */
+  orderBonusClaimed: boolean;
 }
 
 export type DailyEvent =
@@ -97,7 +104,10 @@ function makeTask(kind: DailyTask["id"], rnd: () => number): DailyTask {
   }
 }
 
-/** 2 neighbor orders per day, always on distinct plants, paying 1.5× base price */
+/**
+ * 2 neighbor orders per day (distinct plants, 1.5× base price), plus a 25%
+ * chance of a third express order (1-2 plants, 2× base price).
+ */
 function rollOrders(date: string): Order[] {
   const rnd = mulberry32(seedFrom(`bloom-orders:${date}`));
   const pool = [...PLANT_LIST];
@@ -107,7 +117,7 @@ function rollOrders(date: string): Order[] {
     pool[i] = pool[j];
     pool[j] = tmp;
   }
-  return pool.slice(0, 2).map((def) => {
+  const orders: Order[] = pool.slice(0, 2).map((def) => {
     const count = 2 + Math.floor(rnd() * 3); // 2..4 plants
     return {
       id: `${date}-${def.id}`,
@@ -118,6 +128,20 @@ function rollOrders(date: string): Order[] {
       claimed: false,
     };
   });
+  if (rnd() < 0.25) {
+    const def = pool[Math.floor(rnd() * pool.length)];
+    const count = 1 + Math.floor(rnd() * 2); // 1..2 plants
+    orders.push({
+      id: `${date}-express-${def.id}`,
+      plant: def.id,
+      count,
+      reward: Math.round(def.sellValue * count * 2),
+      progress: 0,
+      claimed: false,
+      express: true,
+    });
+  }
+  return orders;
 }
 
 export function rollDaily(date: string): DailyState {
@@ -129,14 +153,22 @@ export function rollDaily(date: string): DailyState {
     kinds[i] = kinds[j];
     kinds[j] = tmp;
   }
-  return { date, tasks: kinds.slice(0, 3).map((k) => makeTask(k, rnd)), orders: rollOrders(date) };
+  return {
+    date,
+    tasks: kinds.slice(0, 3).map((k) => makeTask(k, rnd)),
+    orders: rollOrders(date),
+    orderBonusClaimed: false,
+  };
 }
 
 export function ensureDaily(saved: DailyState | null, today: string): DailyState {
   if (saved && saved.date === today) {
+    if (saved.orders) {
+      if (saved.orderBonusClaimed !== undefined) return saved;
+      return { ...saved, orderBonusClaimed: false };
+    }
     // old saves predate orders; backfill without touching the day's tasks
-    if (saved.orders) return saved;
-    return { ...saved, orders: rollOrders(today) };
+    return { ...saved, orders: rollOrders(today), orderBonusClaimed: false };
   }
   return rollDaily(today);
 }
@@ -167,12 +199,21 @@ export function advanceOrders(d: DailyState, plant: PlantId): DailyState {
   return changed ? { ...d, orders } : d;
 }
 
-export function claimOrder(d: DailyState, index: number): { state: DailyState; reward: number } | null {
+export function claimOrder(
+  d: DailyState,
+  index: number,
+): { state: DailyState; reward: number; bonus?: number } | null {
   const o = d.orders[index];
   if (!o || o.claimed || o.progress < o.count) return null;
   const orders = d.orders.slice();
   orders[index] = { ...o, claimed: true };
-  return { state: { ...d, orders }, reward: o.reward };
+  const allDone = orders.every((x) => x.claimed);
+  const bonus = allDone && !d.orderBonusClaimed ? ORDER_CLEAR_BONUS : 0;
+  return {
+    state: { ...d, orders, orderBonusClaimed: allDone || d.orderBonusClaimed },
+    reward: o.reward,
+    bonus: bonus || undefined,
+  };
 }
 
 export function unclaimedCount(d: DailyState): number {

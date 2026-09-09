@@ -251,9 +251,11 @@ export default function App() {
       const res = claimOrder(daily, index);
       if (!res) return;
       setDaily(res.state);
-      setState((s) => ({ ...s, coins: s.coins + res.reward, totalEarned: s.totalEarned + res.reward }));
+      const bonus = res.bonus ?? 0;
+      const total = res.reward + bonus;
+      setState((s) => ({ ...s, coins: s.coins + total, totalEarned: s.totalEarned + total }));
       sfx.coin();
-      showToast(`📦 訂單完成！+${res.reward} 金幣`);
+      showToast(bonus > 0 ? `🎉 訂單全數完成！${res.reward} + 感謝禮 ${bonus} = +${total} 金幣` : `📦 訂單完成！+${total} 金幣`);
     },
     [daily, showToast]
   );

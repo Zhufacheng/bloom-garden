@@ -241,7 +241,8 @@ export function harvest(
  * toast message. Events: bee (a mature plant gets a one-time +50% harvest),
  * caterpillar (eats 25% of a random growing plant's progress),
  * shower (all growing plants get refilled), golden hour (2x harvest coins for
- * 60s), rainbow (+30% growth for 60s). 30% of rolls are calm.
+ * 60s), shooting star (all growing plants +10% progress, capped just short
+ * of maturity), rainbow (+30% growth for 60s). 30% of rolls are calm.
  * Always reschedules the next roll 60-180s out.
  */
 export function tickEvents(
@@ -284,6 +285,15 @@ export function tickEvents(
     return {
       state: { ...s, coinBoostUntil: now + 60_000, nextEventAt: next },
       msg: "💰 黃金時刻！60 秒內所有收獲金幣加倍",
+    };
+  }
+  if (r < 0.95) {
+    const plots = s.plots.map((p) =>
+      p.plant && p.progress < 1 ? { ...p, progress: Math.min(0.99, p.progress + 0.1) } : p,
+    );
+    return {
+      state: { ...s, plots, nextEventAt: next },
+      msg: "⭐ 流星劃過！所有生長中的植物進度 +10%",
     };
   }
   return {
