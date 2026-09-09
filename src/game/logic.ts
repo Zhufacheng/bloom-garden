@@ -1,5 +1,6 @@
 import { DECOS, emptyDecorations } from "./decor";
 import { todayStr, yesterdayStr } from "./daily";
+import { plantTierMult } from "./evolve";
 import { marketMult } from "./market";
 import { PETS, emptyPets } from "./pets";
 import { COLUMNS, MAX_ROWS, PLANTS, PLANT_LIST, ROW_COSTS, START_ROWS, emptyCounts, emptySeeds } from "./plants";
@@ -216,7 +217,8 @@ export function sellValueOf(s: GameState, plant: PlantId, golden: boolean, date 
     (s.decorations.butterfly ? 1.1 : 1) *
     (s.upgrades.touch ? 1.1 : 1) *
     (s.pets.cat ? 1.05 : 1) *
-    seasonMult(plant, date);
+    seasonMult(plant, date) *
+    plantTierMult(s, plant);
   return Math.round(base * (golden ? 2 : 1));
 }
 

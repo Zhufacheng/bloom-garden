@@ -9,6 +9,7 @@ import {
   prestigeDewGain,
 } from "../game/logic";
 import { marketMult } from "../game/market";
+import { EVOLVE_TIERS, plantTier, plantTierMult } from "../game/evolve";
 import { MAX_ROWS, PLANT_LIST, ROW_COSTS } from "../game/plants";
 import { PETS } from "../game/pets";
 import { isSeasonPlant, seasonMult } from "../game/seasons";
@@ -92,8 +93,9 @@ export default function Shop({ state, selected, onBuy, onSelect, onBuyMystery, o
         {PLANT_LIST.map((def) => {
           const stock = state.seeds[def.id] ?? 0;
           const mult = marketMult(def.id, today) * seasonMult(def.id, today);
-          const price = Math.round(def.sellValue * mult);
+          const price = Math.round(def.sellValue * mult * plantTierMult(state, def.id));
           const inSeason = isSeasonPlant(def.id, today);
+          const tier = plantTier(state, def.id);
           const arrow = mult > 1.05 ? <span className="mkt up">▲</span> : mult < 0.95 ? <span className="mkt down">▼</span> : null;
           const tMult = marketMult(def.id, tomorrow);
           const trend =
@@ -117,6 +119,11 @@ export default function Shop({ state, selected, onBuy, onSelect, onBuyMystery, o
                 <span className="name">
                   {def.name} <small>{def.nameEn}</small>
                   {inSeason && <span className="season-badge">當季 +20%</span>}
+                  {tier > 0 && (
+                    <span className={`tier-badge t${tier}`}>
+                      {EVOLVE_TIERS[tier].emoji} {EVOLVE_TIERS[tier].name} ×{EVOLVE_TIERS[tier].mult}
+                    </span>
+                  )}
                 </span>
                 <span className="meta">
                   成熟 {def.growTime} 秒 · 今天賣 <b className={`price${mult > 1.05 ? " up" : mult < 0.95 ? " down" : ""}`}>{price}</b> {arrow} · 明天{trend}

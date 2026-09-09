@@ -17,6 +17,7 @@ import {
   type DailyState,
 } from "./game/daily";
 import { DECOS } from "./game/decor";
+import { EVOLVE_TIERS, plantTier } from "./game/evolve";
 import {
   UPGRADES,
   buyDeco,
@@ -127,7 +128,15 @@ export default function App() {
           return advanceOrders(next, harvestedPlant);
         });
         sfx.harvest();
-        if (res.bonus) {
+        const tBefore = plantTier(state, harvestedPlant);
+        const tAfter = plantTier(res.state!, harvestedPlant);
+        if (tAfter > tBefore) {
+          sfx.unlock();
+          const tier = EVOLVE_TIERS[tAfter];
+          showToast(
+            `${tier.emoji} ${PLANTS[harvestedPlant].name}${tier.name}！賣價 ×${tier.mult}（累計收獲 ${res.state!.harvestCounts[harvestedPlant]} 次）`,
+          );
+        } else if (res.bonus) {
           sfx.coin();
           showToast(`🔥 連收 ×${res.combo}！額外 +${res.bonus} 金幣`);
         } else if (res.golden) {

@@ -32,6 +32,7 @@ import {
 import { emptyDecorations } from "./decor";
 import { marketMult } from "./market";
 import { COLUMNS, PLANT_LIST, PLANTS, emptyCounts, emptySeeds } from "./plants";
+import { nextTier, plantTier } from "./evolve";
 import { emptyPets } from "./pets";
 import { SEASONS, seasonMult, seasonOf } from "./seasons";
 import type { DecoId, GameState, PlantId, Plot } from "./types";
@@ -961,5 +962,47 @@ describe("extended milestones", () => {
     const s = { ...newGame(), pets: { ...emptyPets(), cat: true, rabbit: true, hedgehog: true } };
     expect(claimMilestone(s, "pets-3").earned).toBe(100);
     expect(claimMilestone({ ...newGame(), pets: { ...emptyPets(), cat: true } }, "pets-3").error).toBeDefined();
+  });
+});
+
+describe("seed evolution", () => {
+  const at = (n: number, plant: PlantId = "daisy") => ({
+    ...newGame(),
+    harvestCounts: { ...emptyCounts(), [plant]: n },
+  });
+
+  it("tiers unlock at 10 and 50 lifetime harvests", () => {
+    expect(plantTier(at(0), "daisy")).toBe(0);
+    expect(plantTier(at(9), "daisy")).toBe(0);
+    expect(plantTier(at(10), "daisy")).toBe(1);
+    expect(plantTier(at(49), "daisy")).toBe(1);
+    expect(plantTier(at(50), "daisy")).toBe(2);
+    expect(plantTier(at(200), "daisy")).toBe(2);
+  });
+
+  it("evolution is independent per species", () => {
+    const s = { ...newGame(), harvestCounts: { ...emptyCounts(), daisy: 10, rose: 3 } };
+    expect(plantTier(s, "daisy")).toBe(1);
+    expect(plantTier(s, "rose")).toBe(0);
+  });
+
+  it("evolved plants sell for 1.5x, legendary for 2.5x", () => {
+    const m = marketMult("daisy", D);
+    expect(sellValueOf(at(10), "daisy", false, D)).toBe(Math.round(30 * m * 1.5));
+    expect(sellValueOf(at(50), "daisy", false, D)).toBe(Math.round(30 * m * 2.5));
+    // daisy is out of season on D, so no other multipliers apply
+  });
+
+  it("golden doubles stack on top of the tier", () => {
+    let s = plantSeed({ ...newGame(), seeds: { ...emptySeeds(), daisy: 1 } }, 0, "daisy")!.state!;
+    s = { ...s, harvestCounts: { ...emptyCounts(), daisy: 10 } };
+    s = matureAt(s, 0, { golden: true });
+    expect(harvest(s, 0, D).earned).toBe(Math.round(30 * marketMult("daisy", D) * 1.5 * 2));
+  });
+
+  it("nextTier reports the upcoming unlock, null when maxed", () => {
+    expect(nextTier(at(0, "tulip"), "tulip")?.min).toBe(10);
+    expect(nextTier(at(10, "tulip"), "tulip")?.min).toBe(50);
+    expect(nextTier(at(50, "tulip"), "tulip")).toBeNull();
   });
 });

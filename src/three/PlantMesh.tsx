@@ -1,6 +1,7 @@
 import { BUD_COLORS } from "../components/PlantSprite";
 import type { PlantId } from "../game/types";
 import type { Stage } from "../components/PlantSprite";
+import EmojiSprite from "./EmojiSprite";
 
 const STEM = "#558b2f";
 const LEAF = "#66bb6a";
@@ -233,9 +234,11 @@ const STEM_H: Record<PlantId, number> = {
 interface Props {
   plant: PlantId;
   stage: Stage;
+  /** evolution tier (0 normal / 1 evolved / 2 legendary): bigger head + marker */
+  tier?: number;
 }
 
-export default function PlantMesh({ plant, stage }: Props) {
+export default function PlantMesh({ plant, stage, tier = 0 }: Props) {
   const color = BUD_COLORS[plant];
   if (stage === "seed") {
     return (
@@ -284,9 +287,10 @@ export default function PlantMesh({ plant, stage }: Props) {
           <Leaf position={[0.1, h * 0.52, 0]} rotation={[0, 0, -0.6]} color={LEAF_DARK} />
         </>
       )}
-      <group position={[0, h, 0]}>
+      <group position={[0, h, 0]} scale={1 + tier * 0.12}>
         <Head plant={plant} color={color} />
       </group>
+      {tier >= 1 && <EmojiSprite emoji={tier >= 2 ? "🌙" : "🌟"} position={[0, h + 0.5, 0]} scale={0.34} bob />}
     </group>
   );
 }

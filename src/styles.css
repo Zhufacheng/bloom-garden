@@ -280,6 +280,36 @@ button {
   vertical-align: 1px;
 }
 
+.tier-badge {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 5px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 800;
+  vertical-align: 1px;
+}
+
+.tier-badge.t1 {
+  background: #e1bee7;
+  color: #4a148c;
+}
+
+.tier-badge.t2 {
+  background: #ffe082;
+  color: #7a4a00;
+}
+
+.book-evolve {
+  font-size: 10px;
+  font-weight: 700;
+  color: #6a1b9a;
+}
+
+.book-evolve.maxed {
+  color: #b8860b;
+}
+
 .head-chips {
   display: flex;
   gap: 6px;

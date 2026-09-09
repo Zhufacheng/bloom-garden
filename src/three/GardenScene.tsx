@@ -5,6 +5,7 @@ import { stageOf } from "../components/PlantSprite";
 import { isMature } from "../game/logic";
 import { COLUMNS, MAX_ROWS, PLANTS } from "../game/plants";
 import { DECOS } from "../game/decor";
+import { plantTier } from "../game/evolve";
 import { PETS } from "../game/pets";
 import type { GameState, Plot } from "../game/types";
 import EmojiSprite, { emojiTexture } from "./EmojiSprite";
@@ -80,7 +81,7 @@ function PetWander({ emoji, phase }: { emoji: string; phase: number }) {
   );
 }
 
-function PlantWithBadge({ plot }: { plot: Plot }) {
+function PlantWithBadge({ plot, tier }: { plot: Plot; tier: number }) {
   const ref = useRef<THREE.Group>(null);
   const mature = isMature(plot);
   useFrame(({ clock }) => {
@@ -107,7 +108,7 @@ function PlantWithBadge({ plot }: { plot: Plot }) {
         <meshBasicMaterial color="#000000" transparent opacity={0.15} />
       </mesh>
       <group ref={ref}>
-        <PlantMesh plant={plot.plant!} stage={stage} />
+        <PlantMesh plant={plot.plant!} stage={stage} tier={tier} />
       </group>
       {mature && plot.golden && <pointLight color="#ffd54f" intensity={1.6} distance={1.6} position={[0, 0.7, 0]} />}
       {badge && <EmojiSprite emoji={badge} position={[0, 1.05, 0]} scale={0.55} bob />}
@@ -122,12 +123,14 @@ function Plot3D({
   plot,
   locked,
   canPlant,
+  tier,
   onPlotTap,
 }: {
   index: number;
   plot: Plot;
   locked: boolean;
   canPlant: boolean;
+  tier: number;
   onPlotTap: (i: number) => void;
 }) {
   const row = Math.floor(index / COLUMNS);
@@ -154,7 +157,7 @@ function Plot3D({
         <EmojiSprite emoji="🔒" position={[0, 0.75, 0]} scale={0.5} bob />
       ) : (
         <>
-          {plot.plant && <PlantWithBadge plot={plot} />}
+          {plot.plant && <PlantWithBadge plot={plot} tier={tier} />}
           {growing && (
             <group position={[0, 0.26, 0.62]}>
               <mesh>
@@ -207,6 +210,7 @@ function World({ state, canPlant, onPlotTap, worldRef }: WorldProps) {
             plot={p}
             locked={i >= state.rows * COLUMNS}
             canPlant={canPlant}
+            tier={p.plant ? plantTier(state, p.plant) : 0}
             onPlotTap={onPlotTap}
           />
         ))}
