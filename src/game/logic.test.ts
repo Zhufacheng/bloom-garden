@@ -1,15 +1,20 @@
 import { describe, expect, it } from "vitest";
 import {
+  buyDeco,
   buySeed,
+  claimMilestone,
   harvest,
   isUnlocked,
   newGame,
   plantSeed,
+  sellValueOf,
   stepState,
   unlockNextRow,
   waterPlot,
 } from "./logic";
+import { emptyDecorations } from "./decor";
 import { COLUMNS, emptySeeds } from "./plants";
+import type { DecoId, GameState, Plot } from "./types";
 import { rollWeather, tickWeather } from "./weather";
 
 describe("newGame", () => {
@@ -69,9 +74,67 @@ describe("weather effects", () => {
   });
 });
 
+const matureAt = (s: GameState, i: number, patch: Partial<Plot> = {}): GameState => ({
+  ...s,
+  plots: s.plots.map((p, x) => (x === i ? { ...p, progress: 1, ...patch } : p)),
+});
+
+describe("golden plants", () => {
+  it("sell for double", () => {
+    const s = matureAt(plantSeed({ ...newGame(), ...sunny }, 0, "grass")!.state!, 0, { golden: true });
+    expect(harvest(s, 0).earned).toBe(24); // grass 12 x2
+  });
+
+  it("non-golden sells normally", () => {
+    const s = matureAt(plantSeed({ ...newGame(), ...sunny }, 0, "grass")!.state!, 0);
+    expect(harvest(s, 0).earned).toBe(12);
+  });
+});
+
+describe("decorations", () => {
+  const withDeco = (deco: Partial<Record<DecoId, boolean>>) =>
+    ({ ...emptyDecorations(), ...deco }) as Record<DecoId, boolean>;
+
+  it("butterfly adds 10% to sell value", () => {
+    const s = { ...newGame(), decorations: withDeco({ butterfly: true }) };
+    expect(sellValueOf(s, "daisy", false)).toBe(33); // round(30 * 1.1)
+    expect(sellValueOf(s, "daisy", true)).toBe(66); // round(30 * 1.1 * 2)
+  });
+
+  it("fountain slows water drain by 25%", () => {
+    const s = plantSeed({ ...newGame(), ...sunny, decorations: withDeco({ fountain: true }) }, 0, "grass")!.state!;
+    const after = stepState(s, 10);
+    expect(after.plots[0].water).toBeCloseTo(1 - 10 * (1 / 40) * 0.75, 5); // 0.8125
+  });
+
+  it("buyDeco spends coins once", () => {
+    let s = { ...newGame(), coins: 100 };
+    const r = buyDeco(s, "fence");
+    expect(r.state!.decorations.fence).toBe(true);
+    expect(r.state!.coins).toBe(20);
+    expect(buyDeco(r.state!, "fence").error).toBeDefined();
+    expect(buyDeco({ ...newGame(), coins: 10 }, "fence").error).toBeDefined();
+  });
+});
+
+describe("milestones", () => {
+  it("pays once when the condition is met", () => {
+    let s: GameState = { ...newGame(), totalHarvested: 1 };
+    const r = claimMilestone(s, "harvest-1");
+    expect(r.earned).toBe(10);
+    expect(r.state!.coins).toBe(40);
+    expect(r.state!.milestones).toEqual(["harvest-1"]);
+    expect(claimMilestone(r.state!, "harvest-1").error).toBeDefined();
+  });
+
+  it("refuses unmet milestones", () => {
+    expect(claimMilestone(newGame(), "harvest-25").error).toBeDefined();
+  });
+});
+
 describe("cactus (noWater)", () => {
   const cactusState = () =>
-    plantSeed({ ...newGame(), seeds: { ...emptySeeds(), cactus: 1 } }, 0, "cactus")!.state!;
+    plantSeed({ ...newGame(), ...sunny, seeds: { ...emptySeeds(), cactus: 1 } }, 0, "cactus")!.state!;
 
   it("grows to maturity without any water", () => {
     const after = stepState(cactusState(), 45);

@@ -1,5 +1,6 @@
+import { DECOS } from "../game/decor";
 import { MAX_ROWS, PLANT_LIST, ROW_COSTS } from "../game/plants";
-import type { GameState, PlantId } from "../game/types";
+import type { DecoId, GameState, PlantId } from "../game/types";
 import { CoinIcon } from "./Icons";
 import PlantSprite from "./PlantSprite";
 
@@ -8,12 +9,13 @@ interface Props {
   selected: PlantId | null;
   onBuy: (p: PlantId) => void;
   onSelect: (p: PlantId) => void;
+  onBuyDeco: (d: DecoId) => void;
   onUnlockRow: () => void;
   onReset: () => void;
   onClose: () => void;
 }
 
-export default function Shop({ state, selected, onBuy, onSelect, onUnlockRow, onReset, onClose }: Props) {
+export default function Shop({ state, selected, onBuy, onSelect, onBuyDeco, onUnlockRow, onReset, onClose }: Props) {
   return (
     <div className="sheet-overlay" onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
@@ -43,6 +45,7 @@ export default function Shop({ state, selected, onBuy, onSelect, onUnlockRow, on
                 </span>
                 <span className="meta">
                   成熟 {def.growTime} 秒 · 賣出 +{def.sellValue}
+                  {def.noWater && " · 免澆水"}
                   {stock > 0 && <b className="stock"> · 庫存 ×{stock}</b>}
                 </span>
               </span>
@@ -55,6 +58,33 @@ export default function Shop({ state, selected, onBuy, onSelect, onUnlockRow, on
               >
                 <CoinIcon size={13} /> {def.seedCost}
               </button>
+            </div>
+          );
+        })}
+
+        <div className="section-title">裝飾（一次購買，效果永久生效）</div>
+        {DECOS.map((d) => {
+          const owned = state.decorations[d.id];
+          return (
+            <div
+              key={d.id}
+              className={`shop-item${owned ? " selected" : ""}`}
+              onClick={owned ? undefined : () => onBuyDeco(d.id)}
+            >
+              <span className="icon-emoji">{d.emoji}</span>
+              <span className="info">
+                <span className="name">
+                  {d.name}
+                  {owned && <small> ✓ 已擁有</small>}
+                </span>
+                <span className="meta">{d.effect}</span>
+              </span>
+              {!owned && (
+                <span className="price">
+                  <CoinIcon size={14} />
+                  {d.cost}
+                </span>
+              )}
             </div>
           );
         })}

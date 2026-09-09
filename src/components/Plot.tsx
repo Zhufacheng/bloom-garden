@@ -7,6 +7,7 @@ import PlantSprite, { stageOf } from "./PlantSprite";
 interface Floater {
   amount: number;
   key: number;
+  golden?: boolean;
 }
 
 interface Props {
@@ -36,12 +37,13 @@ export default function Plot({ plot, index, locked, lockCost, canPlant, floater,
   }
 
   const mature = isMature(plot);
+  const golden = plot.plant !== null && plot.golden;
   const noWater = plot.plant !== null && PLANTS[plot.plant].noWater;
   const stage = plot.plant ? stageOf(plot.progress) : "seed";
 
   return (
     <button
-      className={`plot${plot.plant ? "" : " empty"}${mature ? " mature" : ""}${canPlant && !plot.plant ? " plantable" : ""}`}
+      className={`plot${plot.plant ? "" : " empty"}${mature ? " mature" : ""}${golden ? " golden" : ""}${canPlant && !plot.plant ? " plantable" : ""}`}
       onClick={onTap}
       aria-label={plot.plant ? PLANTS[plot.plant].name : `空地 ${index + 1}`}
     >
@@ -55,7 +57,9 @@ export default function Plot({ plot, index, locked, lockCost, canPlant, floater,
           <DropIcon />
         </span>
       )}
-      {mature && <span className="harvest-badge">收獲</span>}
+      {mature && (
+        <span className={`harvest-badge${golden ? " golden" : ""}`}>{golden ? "✨ 金色 ×2" : "收獲"}</span>
+      )}
       {plot.plant && (
         <span
           key={stage}
@@ -72,6 +76,7 @@ export default function Plot({ plot, index, locked, lockCost, canPlant, floater,
       {floater && (
         <span key={floater.key} className="coin-float">
           +{floater.amount}
+          {floater.golden ? "✨" : ""}
         </span>
       )}
     </button>

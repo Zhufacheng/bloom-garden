@@ -32,14 +32,18 @@ export function loadGame(): GameState {
     const parsed = JSON.parse(raw) as GameState;
     const now = Date.now();
     const dt = Math.min(Math.max((now - (parsed.savedAt ?? now)) / 1000, 0), OFFLINE_CAP_SEC);
-    // tolerate saves from before the seed stash / weather existed
+    // tolerate saves from before the seed stash / weather / decorations existed
+    const fresh = newGame();
     const merged: GameState = {
-      ...newGame(),
+      ...fresh,
       ...parsed,
       seeds: { ...emptySeeds(), ...(parsed.seeds ?? {}) },
       weather: parsed.weather ?? "sunny",
       weatherUntil: parsed.weatherUntil ?? now + 180_000,
+      decorations: { ...fresh.decorations, ...(parsed.decorations ?? {}) },
+      milestones: parsed.milestones ?? [],
     };
+    merged.plots = merged.plots.map((p) => ({ ...p, golden: p.golden ?? false }));
     return tickWeather(stepState({ ...merged, savedAt: now }, dt), now);
   } catch {
     return newGame();

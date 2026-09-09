@@ -13,10 +13,11 @@ import {
   unclaimedCount,
   type DailyState,
 } from "./game/daily";
-import { buySeed, harvest, isMature, isUnlocked, plantSeed, stepState, unlockNextRow, waterPlot } from "./game/logic";
+import { DECOS } from "./game/decor";
+import { buyDeco, buySeed, claimMilestone, harvest, isMature, isUnlocked, plantSeed, stepState, unlockNextRow, waterPlot } from "./game/logic";
 import { PLANTS } from "./game/plants";
 import { loadDaily, loadGame, resetGame, saveDaily, saveGame } from "./game/save";
-import type { GameState, PlantId } from "./game/types";
+import type { DecoId, GameState, PlantId } from "./game/types";
 import { tickWeather } from "./game/weather";
 import { isMuted, setMuted, sfx } from "./sfx";
 
@@ -24,6 +25,7 @@ interface Floater {
   index: number;
   amount: number;
   key: number;
+  golden?: boolean;
 }
 
 export default function App() {
@@ -88,7 +90,9 @@ export default function App() {
         setState(res.state!);
         setDaily((d) => advanceDaily(advanceDaily(d, { type: "harvest", plants: 1 }), { type: "earn", coins: res.earned! }));
         sfx.harvest();
-        setFloater({ index: i, amount: res.earned!, key: Date.now() });
+        if (res.golden) sfx.coin();
+        if (res.golden) showToast("✨ 金色收獲！賣價加倍");
+        setFloater({ index: i, amount: res.earned!, key: Date.now(), golden: res.golden });
         return;
       }
 
@@ -194,12 +198,45 @@ export default function App() {
     (index: number) => {
       const res = claimTask(daily, index);
       if (!res) return;
+      const bonus = state.decorations.birdhouse ? 10 : 0;
+      const total = res.reward + bonus;
       setDaily(res.state);
-      setState((s) => ({ ...s, coins: s.coins + res.reward }));
+      setState((s) => ({ ...s, coins: s.coins + total }));
       sfx.coin();
-      showToast(`領到 ${res.reward} 金幣 🎉`);
+      showToast(bonus > 0 ? `領到 ${res.reward} + 鳥屋 10 = ${total} 金幣 🎉` : `領到 ${total} 金幣 🎉`);
     },
-    [daily, showToast]
+    [daily, state.decorations, showToast]
+  );
+
+  const onClaimMilestone = useCallback(
+    (id: string) => {
+      const res = claimMilestone(state, id);
+      if (res.error) {
+        sfx.error();
+        showToast(res.error);
+        return;
+      }
+      setState(res.state!);
+      sfx.unlock();
+      showToast(`成就達成！+${res.earned} 金幣 🏅`);
+    },
+    [state, showToast]
+  );
+
+  const onBuyDeco = useCallback(
+    (deco: DecoId) => {
+      const res = buyDeco(state, deco);
+      if (res.error) {
+        sfx.error();
+        showToast(res.error);
+        return;
+      }
+      setState(res.state!);
+      sfx.unlock();
+      const def = DECOS.find((d) => d.id === deco)!;
+      showToast(`買下 ${def.name} ${def.emoji}！效果立即生效`);
+    },
+    [state, showToast]
   );
 
   const toggleSound = useCallback(() => {
@@ -261,12 +298,15 @@ export default function App() {
           selected={hasHand ? hand : null}
           onBuy={onBuySeed}
           onSelect={onSelectSeed}
+          onBuyDeco={onBuyDeco}
           onUnlockRow={onUnlockRow}
           onReset={onReset}
           onClose={() => setShopOpen(false)}
         />
       )}
-      {tasksOpen && <TasksSheet daily={daily} onClaim={onClaimTask} onClose={() => setTasksOpen(false)} />}
+      {tasksOpen && (
+        <TasksSheet daily={daily} game={state} onClaim={onClaimTask} onClaimMilestone={onClaimMilestone} onClose={() => setTasksOpen(false)} />
+      )}
       <Toolbar
         onWater={onWaterTap}
         onShop={() => {

@@ -2,6 +2,8 @@ export type PlantId = "grass" | "daisy" | "daffodil" | "tulip" | "cactus" | "sun
 
 export type WeatherKind = "sunny" | "hot" | "rain";
 
+export type DecoId = "fence" | "fountain" | "butterfly" | "birdhouse";
+
 export interface PlantDef {
   id: PlantId;
   name: string;
@@ -21,6 +23,8 @@ export interface Plot {
   progress: number;
   /** 0..1 water level; growth stops at 0 */
   water: number;
+  /** rare golden variant: sells for double, decided when the plant matures */
+  golden: boolean;
 }
 
 export interface GameState {
@@ -35,6 +39,10 @@ export interface GameState {
   weather: WeatherKind;
   /** epoch ms when the current weather changes */
   weatherUntil: number;
+  /** owned garden decorations */
+  decorations: Record<DecoId, boolean>;
+  /** ids of claimed milestones */
+  milestones: string[];
   /** epoch ms of last save */
   savedAt: number;
 }
