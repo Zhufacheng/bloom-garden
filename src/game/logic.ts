@@ -1,6 +1,7 @@
 import { DECOS, emptyDecorations } from "./decor";
 import { todayStr, yesterdayStr } from "./daily";
 import { plantTierMult } from "./evolve";
+import { levelOf, levelSellMult } from "./level";
 import { marketMult } from "./market";
 import { PETS, emptyPets } from "./pets";
 import { COLUMNS, MAX_ROWS, PLANTS, PLANT_LIST, ROW_COSTS, START_ROWS, emptyCounts, emptySeeds } from "./plants";
@@ -44,6 +45,9 @@ export const FERTILIZER_COST = 40;
 /** max fertilizer that can be stored in the shed */
 export const FERTILIZER_MAX = 5;
 
+/** every N harvests grants one openable gift crate (loot loop) */
+export const HARVESTS_PER_CRATE = 10;
+
 /** permanent upgrades sold in the dew shop (paid with dew, survive prestige) */
 export const UPGRADES: { id: keyof Upgrades; name: string; emoji: string; cost: number; effect: string }[] = [
   { id: "soil", name: "沃土", emoji: "🌱", cost: 3, effect: "所有植物生長速度 +10%" },
@@ -82,6 +86,8 @@ export function newGame(): GameState {
     coinBoostUntil: 0,
     harvestCounts: emptyCounts(),
     fertilizer: 0,
+    crates: 0,
+    crateProgress: 0,
     bestCombo: 0,
     savedAt: Date.now(),
   };
@@ -207,13 +213,15 @@ export function buyFertilizer(s: GameState): { state?: GameState; error?: string
   return { state: { ...s, coins: s.coins - FERTILIZER_COST, fertilizer: s.fertilizer + 1 } };
 }
 
-/** Sell price today: base x daily market x dew x butterfly x golden-touch x season, doubled if golden. */
+/** Sell price today: base x daily market x dew x gardener-level x butterfly x golden-touch x season, doubled if golden. */
 export function sellValueOf(s: GameState, plant: PlantId, golden: boolean, date = todayStr()): number {
   const dewMult = 1 + s.dew * DEW_SELL_BONUS;
+  const levelMult = levelSellMult(levelOf(s.totalEarned));
   const base =
     PLANTS[plant].sellValue *
     marketMult(plant, date) *
     dewMult *
+    levelMult *
     (s.decorations.butterfly ? 1.1 : 1) *
     (s.upgrades.touch ? 1.1 : 1) *
     (s.pets.cat ? 1.05 : 1) *
@@ -231,7 +239,7 @@ export function harvest(
   index: number,
   date = todayStr(),
   now = Date.now(),
-): { state?: GameState; earned?: number; golden?: boolean; combo?: number; bonus?: number; error?: string } {
+): { state?: GameState; earned?: number; golden?: boolean; combo?: number; bonus?: number; crateGained?: boolean; error?: string } {
   const p = s.plots[index];
   if (!p.plant) return { error: "這裡沒有植物" };
   if (!isMature(p)) return { error: "還沒成熟，再澆點水等等它 🌱" };
@@ -240,6 +248,8 @@ export function harvest(
   const combo = now <= s.comboUntil ? s.combo + 1 : 1;
   const bonus = combo >= 3 ? Math.round(base * 0.25 * Math.min(combo / 3, 4)) : 0;
   const earned = base + bonus;
+  const crateStep = s.crateProgress + 1;
+  const crateGained = crateStep >= HARVESTS_PER_CRATE;
   const plots = s.plots.slice();
   plots[index] = { ...createPlot(index) };
   return {
@@ -253,11 +263,66 @@ export function harvest(
       combo,
       comboUntil: now + COMBO_WINDOW_MS,
       bestCombo: Math.max(s.bestCombo, combo),
+      crates: crateGained ? s.crates + 1 : s.crates,
+      crateProgress: crateStep % HARVESTS_PER_CRATE,
     },
     earned,
     bonus,
     combo,
     golden: p.golden,
+    crateGained,
+  };
+}
+
+/** the loot a harvest gift crate can roll when opened */
+export interface CrateReward {
+  kind: "coins" | "seed" | "fertilizer";
+  /** granted seed species (kind === "seed") */
+  plant?: PlantId;
+  /** the seed came from the premium tier (kind === "seed") */
+  premium?: boolean;
+  /** coin amount (kind === "coins") */
+  amount?: number;
+  /** human-readable reward, for toasts */
+  label: string;
+}
+
+/**
+ * Open one unopened harvest gift crate for a random reward.
+ * Weighted: ~45% coins, ~25% a premium seed, ~15% fertilizer (falls back to
+ * coins when the shed is full), ~15% a mystery seed from the full catalog.
+ */
+export function openCrate(
+  s: GameState,
+  rnd: () => number = Math.random,
+): { state?: GameState; reward?: CrateReward; error?: string } {
+  if (s.crates < 1) return { error: "還沒有禮盒，再收獲些植物吧" };
+  const crates = s.crates - 1;
+  const r = rnd();
+  if (r < 0.45) {
+    const amount = 25 + Math.floor(rnd() * 51); // 25..75
+    return { state: { ...s, crates, coins: s.coins + amount }, reward: { kind: "coins", amount, label: `${amount} 金幣` } };
+  }
+  if (r < 0.7) {
+    const plant = PREMIUM_IDS[Math.floor(rnd() * PREMIUM_IDS.length)];
+    return {
+      state: { ...s, crates, seeds: { ...s.seeds, [plant]: (s.seeds[plant] ?? 0) + 1 } },
+      reward: { kind: "seed", plant, premium: true, label: `${PLANTS[plant].name} 種子（高級）` },
+    };
+  }
+  if (r < 0.85) {
+    if (s.fertilizer >= FERTILIZER_MAX) {
+      return {
+        state: { ...s, crates, coins: s.coins + FERTILIZER_COST },
+        reward: { kind: "coins", amount: FERTILIZER_COST, label: `${FERTILIZER_COST} 金幣（肥料倉已滿）` },
+      };
+    }
+    return { state: { ...s, crates, fertilizer: s.fertilizer + 1 }, reward: { kind: "fertilizer", label: "肥料 ×1 🪴" } };
+  }
+  const plant = PLANT_LIST[Math.floor(rnd() * PLANT_LIST.length)].id;
+  return {
+    state: { ...s, crates, seeds: { ...s.seeds, [plant]: (s.seeds[plant] ?? 0) + 1 } },
+    reward: { kind: "seed", plant, premium: false, label: `${PLANTS[plant].name} 種子` },
   };
 }
 

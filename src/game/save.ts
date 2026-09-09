@@ -54,6 +54,8 @@ export function loadGame(): GameState {
       coinBoostUntil: parsed.coinBoostUntil ?? 0,
       harvestCounts: { ...emptyCounts(), ...(parsed.harvestCounts ?? {}) },
       fertilizer: parsed.fertilizer ?? 0,
+      crates: parsed.crates ?? 0,
+      crateProgress: parsed.crateProgress ?? 0,
       bestCombo: parsed.bestCombo ?? 0,
     };
     merged.plots = merged.plots.map((p) => ({

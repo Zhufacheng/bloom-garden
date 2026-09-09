@@ -18,6 +18,7 @@ import {
 } from "./game/daily";
 import { DECOS } from "./game/decor";
 import { EVOLVE_TIERS, plantTier } from "./game/evolve";
+import { levelInfo } from "./game/level";
 import {
   UPGRADES,
   buyDeco,
@@ -32,6 +33,7 @@ import {
   harvest,
   isMature,
   isUnlocked,
+  openCrate,
   plantSeed,
   prestige,
   stepState,
@@ -128,14 +130,23 @@ export default function App() {
           return advanceOrders(next, harvestedPlant);
         });
         sfx.harvest();
+        const lvlBefore = levelInfo(state).level;
+        const lvlAfter = levelInfo(res.state!).level;
         const tBefore = plantTier(state, harvestedPlant);
         const tAfter = plantTier(res.state!, harvestedPlant);
-        if (tAfter > tBefore) {
+        if (lvlAfter > lvlBefore) {
+          sfx.unlock();
+          const li = levelInfo(res.state!);
+          showToast(`🧑‍🌾 升級！Lv.${li.level} ${li.title}（賣價 +${Math.round((li.sellMult - 1) * 100)}%）`);
+        } else if (tAfter > tBefore) {
           sfx.unlock();
           const tier = EVOLVE_TIERS[tAfter];
           showToast(
             `${tier.emoji} ${PLANTS[harvestedPlant].name}${tier.name}！賣價 ×${tier.mult}（累計收獲 ${res.state!.harvestCounts[harvestedPlant]} 次）`,
           );
+        } else if (res.crateGained) {
+          sfx.unlock();
+          showToast(`🎁 收獲禮盒 +1！去花店開啟（現有 ${res.state!.crates} 個）`);
         } else if (res.bonus) {
           sfx.coin();
           showToast(`🔥 連收 ×${res.combo}！額外 +${res.bonus} 金幣`);
@@ -314,6 +325,20 @@ export default function App() {
     showToast(`🎰 高級盲盒：${PLANTS[res.plant].name}種子！點空地種下它`);
   }, [state, showToast]);
 
+  const onOpenCrate = useCallback(() => {
+    const res = openCrate(state);
+    if (res.error || !res.reward) {
+      sfx.error();
+      showToast(res.error ?? "開啟失敗");
+      return;
+    }
+    setState(res.state!);
+    sfx.coin();
+    // a granted seed is picked up in the hand so it can be planted immediately
+    if (res.reward.kind === "seed" && res.reward.plant) setHand(res.reward.plant);
+    showToast(`🎁 禮盒開啟：${res.reward.label}`);
+  }, [state, showToast]);
+
   const onBuyUpgrade = useCallback(
     (id: keyof Upgrades) => {
       const res = buyUpgrade(state, id);
@@ -418,6 +443,7 @@ export default function App() {
   }, [showToast]);
 
   const beginnerHint = state.totalHarvested === 0 && state.plots.every((p) => !p.plant);
+  const li = levelInfo(state);
 
   return (
     <div className="app">
@@ -427,6 +453,8 @@ export default function App() {
         unclaimed={unclaimedCount(daily)}
         combo={Date.now() < state.comboUntil ? state.combo : 0}
         dew={state.dew}
+        level={li.level}
+        title={li.title}
         soundOn={soundOn}
         onTasks={() => {
           sfx.select();
@@ -469,6 +497,7 @@ export default function App() {
           onSelect={onSelectSeed}
           onBuyMystery={onBuyMystery}
           onBuyPremium={onBuyPremium}
+          onOpenCrate={onOpenCrate}
           onBuyFertilizer={onBuyFertilizer}
           onBuyDeco={onBuyDeco}
           onBuyPet={onBuyPet}

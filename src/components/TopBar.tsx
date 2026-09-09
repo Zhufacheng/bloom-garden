@@ -6,18 +6,20 @@ interface Props {
   unclaimed: number;
   combo: number;
   dew: number;
+  level: number;
+  title: string;
   soundOn: boolean;
   onTasks: () => void;
   onBook: () => void;
   onToggleSound: () => void;
 }
 
-export default function TopBar({ coins, harvested, unclaimed, combo, dew, soundOn, onTasks, onBook, onToggleSound }: Props) {
+export default function TopBar({ coins, harvested, unclaimed, combo, dew, level, title, soundOn, onTasks, onBook, onToggleSound }: Props) {
   return (
     <header className="topbar">
       <div className="title">
         🌷 花花草草
-        <small>BLOOM GARDEN · 養成小遊戲</small>
+        <small>Lv.{level} {title} · BLOOM GARDEN</small>
       </div>
       <div className="top-actions">
         {combo >= 2 && (

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   FERTILIZER_COST,
+  FERTILIZER_MAX,
   MILESTONES,
   MYSTERY_COST,
   PREMIUM_COST,
@@ -19,6 +20,7 @@ import {
   harvest,
   isUnlocked,
   newGame,
+  openCrate,
   plantSeed,
   prestige,
   prestigeDewGain,
@@ -33,6 +35,7 @@ import { emptyDecorations } from "./decor";
 import { marketMult } from "./market";
 import { COLUMNS, PLANT_LIST, PLANTS, emptyCounts, emptySeeds } from "./plants";
 import { nextTier, plantTier } from "./evolve";
+import { LEVEL_TITLES, levelInfo, levelOf, levelSellMult, levelTitle } from "./level";
 import { emptyPets } from "./pets";
 import { SEASONS, seasonMult, seasonOf } from "./seasons";
 import type { DecoId, GameState, PlantId, Plot } from "./types";
@@ -1004,5 +1007,120 @@ describe("seed evolution", () => {
     expect(nextTier(at(0, "tulip"), "tulip")?.min).toBe(10);
     expect(nextTier(at(10, "tulip"), "tulip")?.min).toBe(50);
     expect(nextTier(at(50, "tulip"), "tulip")).toBeNull();
+  });
+});
+
+describe("gardener level", () => {
+  it("level follows the sqrt-of-earnings curve", () => {
+    expect(levelOf(0)).toBe(1);
+    expect(levelOf(99)).toBe(1);
+    expect(levelOf(100)).toBe(2);
+    expect(levelOf(900)).toBe(4);
+    expect(levelOf(10000)).toBe(11);
+  });
+
+  it("sell bonus is +2% per level, capped at +50%", () => {
+    expect(levelSellMult(1)).toBeCloseTo(1, 5);
+    expect(levelSellMult(2)).toBeCloseTo(1.02, 5);
+    expect(levelSellMult(11)).toBeCloseTo(1.2, 5);
+    expect(levelSellMult(26)).toBeCloseTo(1.5, 5); // cap reached
+    expect(levelSellMult(50)).toBeCloseTo(1.5, 5); // stays capped
+  });
+
+  it("titles map to levels and clamp at the top", () => {
+    expect(levelTitle(1)).toBe("新手農夫");
+    expect(levelTitle(4)).toBe("花匠");
+    expect(levelTitle(LEVEL_TITLES.length)).toBe("花之神");
+    expect(levelTitle(LEVEL_TITLES.length + 5)).toBe("花之神");
+  });
+
+  it("levelInfo reports progress toward the next level", () => {
+    const li = levelInfo({ ...newGame(), totalEarned: 225 });
+    expect(li.level).toBe(2);
+    expect(li.frac).toBeCloseTo(0.4167, 4);
+    expect(li.sellMult).toBeCloseTo(1.02, 5);
+  });
+
+  it("level 1 is identity, higher levels raise the sell value", () => {
+    const m = marketMult("daisy", D);
+    // daisy is out of season on D, so only the level multiplier applies
+    expect(sellValueOf({ ...newGame(), totalEarned: 0 }, "daisy", false, D)).toBe(Math.round(30 * m));
+    expect(sellValueOf({ ...newGame(), totalEarned: 900 }, "daisy", false, D)).toBe(Math.round(30 * m * 1.06));
+    expect(sellValueOf({ ...newGame(), totalEarned: 10000 }, "daisy", false, D)).toBe(Math.round(30 * m * 1.2));
+  });
+});
+
+describe("harvest gift crates", () => {
+  it("grants a crate on the 10th harvest and wraps the progress", () => {
+    let s = { ...newGame(), crateProgress: 9 };
+    s = matureAt(plantSeed(s, 0, "grass")!.state!, 0);
+    const r = harvest(s, 0, D);
+    expect(r.crateGained).toBe(true);
+    expect(r.state!.crates).toBe(1);
+    expect(r.state!.crateProgress).toBe(0);
+  });
+
+  it("does not grant a crate before the 10th harvest", () => {
+    let s = { ...newGame(), crateProgress: 5 };
+    s = matureAt(plantSeed(s, 0, "grass")!.state!, 0);
+    const r = harvest(s, 0, D);
+    expect(r.crateGained).toBe(false);
+    expect(r.state!.crates).toBe(0);
+    expect(r.state!.crateProgress).toBe(6);
+  });
+
+  it("crates reset on prestige", () => {
+    const s = { ...newGame(), totalEarned: 800, crates: 3, crateProgress: 4 };
+    const st = prestige(s).state!;
+    expect(st.crates).toBe(0);
+    expect(st.crateProgress).toBe(0);
+  });
+});
+
+describe("openCrate", () => {
+  it("refuses when there are no crates", () => {
+    expect(openCrate(newGame()).error).toBeDefined();
+  });
+
+  it("rolls coins (band < 0.45)", () => {
+    const s = { ...newGame(), coins: 0, crates: 1 };
+    const r = openCrate(s, () => 0.1); // amount = 25 + floor(0.1 * 51) = 30
+    expect(r.reward!.kind).toBe("coins");
+    expect(r.reward!.amount).toBe(30);
+    expect(r.state!.coins).toBe(30);
+    expect(r.state!.crates).toBe(0);
+  });
+
+  it("rolls a premium seed (0.45 <= band < 0.7)", () => {
+    const s = { ...newGame(), coins: 100, crates: 1 };
+    const r = openCrate(s, () => 0.5); // PREMIUM_IDS[floor(0.5 * 6)] = "lotus"
+    expect(r.reward!.kind).toBe("seed");
+    expect(r.reward!.plant).toBe("lotus");
+    expect(r.reward!.premium).toBe(true);
+    expect(r.state!.seeds.lotus).toBe(1);
+  });
+
+  it("rolls fertilizer (0.7 <= band < 0.85)", () => {
+    const s = { ...newGame(), fertilizer: 0, crates: 1 };
+    const r = openCrate(s, () => 0.8);
+    expect(r.reward!.kind).toBe("fertilizer");
+    expect(r.state!.fertilizer).toBe(1);
+  });
+
+  it("fertilizer falls back to coins when the shed is full", () => {
+    const s = { ...newGame(), fertilizer: FERTILIZER_MAX, coins: 0, crates: 1 };
+    const r = openCrate(s, () => 0.8);
+    expect(r.reward!.kind).toBe("coins");
+    expect(r.reward!.amount).toBe(FERTILIZER_COST);
+    expect(r.state!.fertilizer).toBe(FERTILIZER_MAX);
+  });
+
+  it("rolls a mystery seed from the full catalog (band >= 0.85)", () => {
+    const s = { ...newGame(), crates: 1 };
+    const r = openCrate(s, () => 0.9); // PLANT_LIST[floor(0.9 * 12)] = "cherry"
+    expect(r.reward!.kind).toBe("seed");
+    expect(r.reward!.plant).toBe("cherry");
+    expect(r.reward!.premium).toBe(false);
+    expect(r.state!.seeds.cherry).toBe(1);
   });
 });

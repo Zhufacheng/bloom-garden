@@ -95,6 +95,10 @@ export interface GameState {
   harvestCounts: Record<PlantId, number>;
   /** fertilizer in the shed; auto-applied when planting (grows 2x faster) */
   fertilizer: number;
+  /** unopened harvest gift crates (earned every HARVESTS_PER_CRATE harvests) */
+  crates: number;
+  /** harvests accumulated toward the next gift crate */
+  crateProgress: number;
   /** highest combo streak reached this run */
   bestCombo: number;
   /** epoch ms of last save */

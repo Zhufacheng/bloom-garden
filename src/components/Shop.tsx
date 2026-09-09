@@ -1,8 +1,10 @@
 import { todayStr, tomorrowStr } from "../game/daily";
 import { DECOS } from "../game/decor";
+import { levelInfo } from "../game/level";
 import {
   FERTILIZER_COST,
   FERTILIZER_MAX,
+  HARVESTS_PER_CRATE,
   MYSTERY_COST,
   PREMIUM_COST,
   UPGRADES,
@@ -24,6 +26,7 @@ interface Props {
   onSelect: (p: PlantId) => void;
   onBuyMystery: () => void;
   onBuyPremium: () => void;
+  onOpenCrate: () => void;
   onBuyFertilizer: () => void;
   onBuyDeco: (d: DecoId) => void;
   onBuyPet: (p: PetId) => void;
@@ -34,10 +37,11 @@ interface Props {
   onClose: () => void;
 }
 
-export default function Shop({ state, selected, onBuy, onSelect, onBuyMystery, onBuyPremium, onBuyFertilizer, onBuyDeco, onBuyPet, onUnlockRow, onPrestige, onBuyUpgrade, onReset, onClose }: Props) {
+export default function Shop({ state, selected, onBuy, onSelect, onBuyMystery, onBuyPremium, onOpenCrate, onBuyFertilizer, onBuyDeco, onBuyPet, onUnlockRow, onPrestige, onBuyUpgrade, onReset, onClose }: Props) {
   const today = todayStr();
   const tomorrow = tomorrowStr();
   const dewGain = prestigeDewGain(state);
+  const li = levelInfo(state);
 
   return (
     <div className="sheet-overlay" onClick={onClose}>
@@ -47,6 +51,49 @@ export default function Shop({ state, selected, onBuy, onSelect, onBuyMystery, o
           <h2>🏪 花店</h2>
           <button className="close-btn" onClick={onClose} aria-label="關閉">
             ✕
+          </button>
+        </div>
+
+        <div className="shop-item level-card">
+          <span className="icon-emoji">🧑‍🌾</span>
+          <span className="info">
+            <span className="name">
+              Lv.{li.level} {li.title}
+              <small>賣價加成 +{Math.round((li.sellMult - 1) * 100)}%</small>
+            </span>
+            <span className="meta">
+              {li.nextAt > li.curAt ? `再賺 ${Math.max(0, li.nextAt - state.totalEarned)} 金幣升 Lv.${li.level + 1}` : "已達頂尖等級"}
+              （轉生會重置）
+            </span>
+            <span className="level-bar">
+              <span style={{ width: `${Math.round(li.frac * 100)}%` }} />
+            </span>
+          </span>
+        </div>
+
+        <div className="section-title">🎁 收獲禮盒（每收獲 {HARVESTS_PER_CRATE} 株得 1 個，開啟抽獎勵）</div>
+        <div
+          className={`shop-item crate${state.crates > 0 ? " ready" : ""}`}
+          onClick={state.crates > 0 ? onOpenCrate : undefined}
+        >
+          <span className="icon-emoji">🎁</span>
+          <span className="info">
+            <span className="name">
+              收獲禮盒 <small>{state.crates} 個待開啟</small>
+            </span>
+            <span className="meta">
+              進度 {state.crateProgress}/{HARVESTS_PER_CRATE} · 開啟抽：金幣／高級種子／肥料／神秘種子
+            </span>
+          </span>
+          <button
+            className="buy-btn"
+            disabled={state.crates < 1}
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenCrate();
+            }}
+          >
+            🎁 ×{state.crates}
           </button>
         </div>
 

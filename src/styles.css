@@ -888,6 +888,43 @@ button {
   box-shadow: none;
 }
 
+/* gardener level card (top of shop) */
+.shop-item.level-card {
+  background: linear-gradient(135deg, #f1f8e9, #dcedc8);
+  border-color: #aed581;
+  cursor: default;
+}
+
+.level-bar {
+  display: block;
+  height: 7px;
+  width: 100%;
+  margin-top: 4px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.level-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #aed581, #689f38);
+  transition: width 0.3s ease;
+}
+
+/* harvest gift crate (shop) */
+.shop-item.crate {
+  background: #f7faf5;
+  border-color: #e3eedd;
+}
+
+.shop-item.crate.ready {
+  background: linear-gradient(135deg, #fff8e1, #ffecb3);
+  border-color: #ffca28;
+  animation: premiumGlow 2.4s ease-in-out infinite;
+}
+
 .shop-item .buy-btn {
   flex: none;
   display: flex;
