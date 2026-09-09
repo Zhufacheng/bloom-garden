@@ -1,4 +1,7 @@
-/** Daily tasks: a fresh set of 3 tasks each local day, coin rewards for completing them. */
+import { PLANT_LIST } from "./plants";
+import type { PlantId } from "./types";
+
+/** Daily content: 3 tasks + 2 neighbor orders, refreshed each local day. */
 
 export interface DailyTask {
   id: "harvest" | "water" | "earn" | "plant";
@@ -9,9 +12,20 @@ export interface DailyTask {
   claimed: boolean;
 }
 
+/** a neighbor's order: harvest N of one plant for a 1.5× base-price bounty */
+export interface Order {
+  id: string;
+  plant: PlantId;
+  count: number;
+  reward: number;
+  progress: number;
+  claimed: boolean;
+}
+
 export interface DailyState {
   date: string; // local YYYY-MM-DD
   tasks: DailyTask[];
+  orders: Order[];
 }
 
 export type DailyEvent =
@@ -30,6 +44,12 @@ export function todayStr(now = new Date()): string {
 export function yesterdayStr(now = new Date()): string {
   const d = new Date(now);
   d.setDate(d.getDate() - 1);
+  return todayStr(d);
+}
+
+export function tomorrowStr(now = new Date()): string {
+  const d = new Date(now);
+  d.setDate(d.getDate() + 1);
   return todayStr(d);
 }
 
@@ -77,6 +97,29 @@ function makeTask(kind: DailyTask["id"], rnd: () => number): DailyTask {
   }
 }
 
+/** 2 neighbor orders per day, always on distinct plants, paying 1.5× base price */
+function rollOrders(date: string): Order[] {
+  const rnd = mulberry32(seedFrom(`bloom-orders:${date}`));
+  const pool = [...PLANT_LIST];
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1));
+    const tmp = pool[i];
+    pool[i] = pool[j];
+    pool[j] = tmp;
+  }
+  return pool.slice(0, 2).map((def) => {
+    const count = 2 + Math.floor(rnd() * 3); // 2..4 plants
+    return {
+      id: `${date}-${def.id}`,
+      plant: def.id,
+      count,
+      reward: Math.round(def.sellValue * count * 1.5),
+      progress: 0,
+      claimed: false,
+    };
+  });
+}
+
 export function rollDaily(date: string): DailyState {
   const rnd = mulberry32(seedFrom(`bloom-garden:${date}`));
   const kinds = [...TASK_IDS];
@@ -86,11 +129,15 @@ export function rollDaily(date: string): DailyState {
     kinds[i] = kinds[j];
     kinds[j] = tmp;
   }
-  return { date, tasks: kinds.slice(0, 3).map((k) => makeTask(k, rnd)) };
+  return { date, tasks: kinds.slice(0, 3).map((k) => makeTask(k, rnd)), orders: rollOrders(date) };
 }
 
 export function ensureDaily(saved: DailyState | null, today: string): DailyState {
-  if (saved && saved.date === today) return saved;
+  if (saved && saved.date === today) {
+    // old saves predate orders; backfill without touching the day's tasks
+    if (saved.orders) return saved;
+    return { ...saved, orders: rollOrders(today) };
+  }
   return rollDaily(today);
 }
 
@@ -108,6 +155,24 @@ export function claimTask(d: DailyState, index: number): { state: DailyState; re
   const tasks = d.tasks.slice();
   tasks[index] = { ...t, claimed: true };
   return { state: { ...d, tasks }, reward: t.reward };
+}
+
+export function advanceOrders(d: DailyState, plant: PlantId): DailyState {
+  let changed = false;
+  const orders = d.orders.map((o) => {
+    if (o.claimed || o.plant !== plant || o.progress >= o.count) return o;
+    changed = true;
+    return { ...o, progress: o.progress + 1 };
+  });
+  return changed ? { ...d, orders } : d;
+}
+
+export function claimOrder(d: DailyState, index: number): { state: DailyState; reward: number } | null {
+  const o = d.orders[index];
+  if (!o || o.claimed || o.progress < o.count) return null;
+  const orders = d.orders.slice();
+  orders[index] = { ...o, claimed: true };
+  return { state: { ...d, orders }, reward: o.reward };
 }
 
 export function unclaimedCount(d: DailyState): number {

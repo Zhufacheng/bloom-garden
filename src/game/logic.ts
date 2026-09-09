@@ -1,7 +1,7 @@
 import { DECOS, emptyDecorations } from "./decor";
 import { todayStr, yesterdayStr } from "./daily";
 import { marketMult } from "./market";
-import { COLUMNS, MAX_ROWS, PLANTS, PLANT_LIST, ROW_COSTS, START_ROWS, emptySeeds } from "./plants";
+import { COLUMNS, MAX_ROWS, PLANTS, PLANT_LIST, ROW_COSTS, START_ROWS, emptyCounts, emptySeeds } from "./plants";
 import { DRAIN_RATES, REFILL_RATES, rollWeather } from "./weather";
 import type { DecoId, GameState, PlantId, Plot } from "./types";
 
@@ -58,6 +58,7 @@ export function newGame(): GameState {
     checkInStreak: 0,
     dew: 0,
     coinBoostUntil: 0,
+    harvestCounts: emptyCounts(),
     savedAt: Date.now(),
   };
 }
@@ -199,6 +200,7 @@ export function harvest(
       plots,
       totalHarvested: s.totalHarvested + 1,
       totalEarned: s.totalEarned + earned,
+      harvestCounts: { ...s.harvestCounts, [p.plant]: (s.harvestCounts[p.plant] ?? 0) + 1 },
       combo,
       comboUntil: now + COMBO_WINDOW_MS,
     },
@@ -346,7 +348,13 @@ export function prestige(s: GameState): { state?: GameState; dewGained?: number;
   }
   const fresh = newGame();
   return {
-    state: { ...fresh, dew: s.dew + dewGained, lastCheckIn: s.lastCheckIn, checkInStreak: s.checkInStreak },
+    state: {
+      ...fresh,
+      dew: s.dew + dewGained,
+      lastCheckIn: s.lastCheckIn,
+      checkInStreak: s.checkInStreak,
+      harvestCounts: s.harvestCounts,
+    },
     dewGained,
   };
 }

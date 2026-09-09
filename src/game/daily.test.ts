@@ -1,5 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { advanceDaily, allClaimed, claimTask, ensureDaily, rollDaily, todayStr, unclaimedCount, type DailyEvent, type DailyTask } from "./daily";
+import {
+  advanceDaily,
+  advanceOrders,
+  allClaimed,
+  claimOrder,
+  claimTask,
+  ensureDaily,
+  rollDaily,
+  todayStr,
+  unclaimedCount,
+  type DailyEvent,
+  type DailyState,
+  type DailyTask,
+} from "./daily";
+import { PLANT_LIST } from "./plants";
 
 function eventFor(id: DailyTask["id"], amount: number): DailyEvent {
   switch (id) {
@@ -76,9 +90,68 @@ describe("advanceDaily", () => {
       tasks: [
         { id: "earn" as const, desc: "賺取 50 金幣", target: 50, progress: 20, reward: 35, claimed: false },
       ],
+      orders: [],
     };
     const after = advanceDaily(state, { type: "earn", coins: 40 });
     expect(after.tasks[0].progress).toBe(50);
+  });
+});
+
+describe("orders", () => {
+  it("rolls 2 distinct-plant orders deterministically, paying 1.5x base price", () => {
+    const a = rollDaily("2026-09-08");
+    const b = rollDaily("2026-09-08");
+    expect(a.orders).toEqual(b.orders);
+    expect(a.orders).toHaveLength(2);
+    expect(new Set(a.orders.map((o) => o.plant)).size).toBe(2);
+    for (const o of a.orders) {
+      const def = PLANT_LIST.find((p) => p.id === o.plant)!;
+      expect(o.count).toBeGreaterThanOrEqual(2);
+      expect(o.count).toBeLessThanOrEqual(4);
+      expect(o.reward).toBe(Math.round(def.sellValue * o.count * 1.5));
+      expect(o.progress).toBe(0);
+      expect(o.claimed).toBe(false);
+    }
+  });
+
+  it("advances only the matching unclaimed order", () => {
+    const d = rollDaily("2026-09-08");
+    const [o1, o2] = d.orders;
+    const after = advanceOrders(d, o1.plant);
+    expect(after.orders[0].progress).toBe(1);
+    expect(after.orders[1]).toBe(o2);
+    const missing = PLANT_LIST.find((p) => !d.orders.some((o) => o.plant === p.id))!.id;
+    expect(advanceOrders(d, missing)).toBe(d);
+  });
+
+  it("stops advancing completed orders", () => {
+    const d = rollDaily("2026-09-08");
+    const target = d.orders[0].count;
+    let cur = d;
+    for (let i = 0; i < target; i++) cur = advanceOrders(cur, d.orders[0].plant);
+    expect(cur.orders[0].progress).toBe(target);
+    expect(advanceOrders(cur, d.orders[0].plant)).toBe(cur);
+  });
+
+  it("pays the bounty once and refuses incomplete claims", () => {
+    const d = rollDaily("2026-09-08");
+    const o = d.orders[1];
+    expect(claimOrder(d, 1)).toBeNull();
+    let cur = d;
+    for (let i = 0; i < o.count; i++) cur = advanceOrders(cur, o.plant);
+    const res = claimOrder(cur, 1);
+    expect(res!.reward).toBe(o.reward);
+    expect(res!.state.orders[1].claimed).toBe(true);
+    expect(claimOrder(res!.state, 1)).toBeNull();
+  });
+
+  it("ensureDaily backfills orders on same-day saves from before orders existed", () => {
+    const fresh = rollDaily("2026-09-08");
+    const legacy = { date: "2026-09-08", tasks: fresh.tasks } as unknown as DailyState;
+    const migrated = ensureDaily(legacy, "2026-09-08");
+    expect(migrated.tasks).toBe(fresh.tasks);
+    expect(migrated.orders).toEqual(fresh.orders);
+    expect(ensureDaily(fresh, "2026-09-08")).toBe(fresh);
   });
 });
 
@@ -103,6 +176,7 @@ describe("claimTask / unclaimedCount / allClaimed", () => {
         { id: "water" as const, desc: "", target: 5, progress: 1, reward: 5, claimed: false },
         { id: "plant" as const, desc: "", target: 2, progress: 2, reward: 5, claimed: true },
       ],
+      orders: [],
     };
     expect(unclaimedCount(state)).toBe(1);
     const res = claimTask(state, 0)!;
@@ -117,6 +191,7 @@ describe("claimTask / unclaimedCount / allClaimed", () => {
         { id: "water" as const, desc: "", target: 5, progress: 5, reward: 5, claimed: true },
         { id: "plant" as const, desc: "", target: 2, progress: 2, reward: 5, claimed: true },
       ],
+      orders: [],
     };
     expect(allClaimed(base)).toBe(false);
     expect(allClaimed(claimTask(base, 0)!.state)).toBe(true);

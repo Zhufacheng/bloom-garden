@@ -1,4 +1,4 @@
-import { todayStr } from "../game/daily";
+import { todayStr, tomorrowStr } from "../game/daily";
 import { DECOS } from "../game/decor";
 import { MYSTERY_COST, PREMIUM_COST, prestigeDewGain } from "../game/logic";
 import { marketMult } from "../game/market";
@@ -23,6 +23,7 @@ interface Props {
 
 export default function Shop({ state, selected, onBuy, onSelect, onBuyMystery, onBuyPremium, onBuyDeco, onUnlockRow, onPrestige, onReset, onClose }: Props) {
   const today = todayStr();
+  const tomorrow = tomorrowStr();
   const dewGain = prestigeDewGain(state);
 
   return (
@@ -62,6 +63,15 @@ export default function Shop({ state, selected, onBuy, onSelect, onBuyMystery, o
           const mult = marketMult(def.id, today);
           const price = Math.round(def.sellValue * mult);
           const arrow = mult > 1.05 ? <span className="mkt up">▲</span> : mult < 0.95 ? <span className="mkt down">▼</span> : null;
+          const tMult = marketMult(def.id, tomorrow);
+          const trend =
+            tMult > mult * 1.02 ? (
+              <span className="mkt up">▲</span>
+            ) : tMult < mult * 0.98 ? (
+              <span className="mkt down">▼</span>
+            ) : (
+              <span className="mkt">→</span>
+            );
           return (
             <div
               key={def.id}
@@ -76,7 +86,7 @@ export default function Shop({ state, selected, onBuy, onSelect, onBuyMystery, o
                   {def.name} <small>{def.nameEn}</small>
                 </span>
                 <span className="meta">
-                  成熟 {def.growTime} 秒 · 今天賣 <b className={`price${mult > 1.05 ? " up" : mult < 0.95 ? " down" : ""}`}>{price}</b> {arrow}
+                  成熟 {def.growTime} 秒 · 今天賣 <b className={`price${mult > 1.05 ? " up" : mult < 0.95 ? " down" : ""}`}>{price}</b> {arrow} · 明天{trend}
                   {def.noWater && " · 免澆水"}
                   {stock > 0 && <b className="stock"> · 庫存 ×{stock}</b>}
                 </span>

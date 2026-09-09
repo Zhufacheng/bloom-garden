@@ -24,7 +24,7 @@ import {
 } from "./logic";
 import { emptyDecorations } from "./decor";
 import { marketMult } from "./market";
-import { COLUMNS, PLANT_LIST, PLANTS, emptySeeds } from "./plants";
+import { COLUMNS, PLANT_LIST, PLANTS, emptyCounts, emptySeeds } from "./plants";
 import type { DecoId, GameState, Plot } from "./types";
 import { rollWeather, tickWeather } from "./weather";
 
@@ -305,6 +305,15 @@ describe("harvest", () => {
     expect(r.state!.plots[0].plant).toBeNull();
     expect(r.state!.totalHarvested).toBe(1);
     expect(r.state!.totalEarned).toBe(expected);
+  });
+
+  it("counts the harvest into the plant book", () => {
+    let s = plantSeed(newGame(), 0, "grass")!.state!;
+    s = stepState(s, 20);
+    s = { ...s, harvestCounts: { ...s.harvestCounts, grass: 4 } };
+    const r = harvest(s, 0, D);
+    expect(r.state!.harvestCounts.grass).toBe(5);
+    expect(r.state!.harvestCounts.daisy).toBe(0);
   });
 
   it("refuses an immature plant", () => {
@@ -669,8 +678,15 @@ describe("prestige (dew)", () => {
     expect(r.error).toBeDefined();
   });
 
-  it("resets the garden but keeps dew and check-in", () => {
-    const s = { ...newGame(), totalEarned: 800, coins: 999, lastCheckIn: "2026-09-09", checkInStreak: 3 };
+  it("resets the garden but keeps dew, check-in and the plant book", () => {
+    const s = {
+      ...newGame(),
+      totalEarned: 800,
+      coins: 999,
+      lastCheckIn: "2026-09-09",
+      checkInStreak: 3,
+      harvestCounts: { ...emptyCounts(), rose: 5 },
+    };
     const r = prestige(s);
     expect(r.dewGained).toBe(2);
     const st = r.state!;
@@ -680,6 +696,7 @@ describe("prestige (dew)", () => {
     expect(st.lastCheckIn).toBe("2026-09-09");
     expect(st.checkInStreak).toBe(3);
     expect(st.decorations.fountain).toBe(false);
+    expect(st.harvestCounts.rose).toBe(5);
   });
 });
 

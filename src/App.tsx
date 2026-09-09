@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Garden from "./components/Garden";
+import PlantBook from "./components/PlantBook";
 import PlantSprite from "./components/PlantSprite";
 import Shop from "./components/Shop";
 import TasksSheet from "./components/TasksSheet";
@@ -7,6 +8,8 @@ import TopBar from "./components/TopBar";
 import Toolbar from "./components/Toolbar";
 import {
   advanceDaily,
+  advanceOrders,
+  claimOrder,
   claimTask,
   ensureDaily,
   todayStr,
@@ -50,6 +53,7 @@ export default function App() {
   const [hand, setHand] = useState<PlantId | null>(null);
   const [shopOpen, setShopOpen] = useState(false);
   const [tasksOpen, setTasksOpen] = useState(false);
+  const [bookOpen, setBookOpen] = useState(false);
   const [soundOn, setSoundOn] = useState(!isMuted());
   const [toast, setToast] = useState<{ msg: string; key: number } | null>(null);
   const [floater, setFloater] = useState<Floater | null>(null);
@@ -106,13 +110,17 @@ export default function App() {
 
       // 成熟 → 直接收獲（不用切工具）
       if (p.plant && isMature(p)) {
+        const harvestedPlant = p.plant;
         const res = harvest(state, i);
         if (res.error) {
           showToast(res.error);
           return;
         }
         setState(res.state!);
-        setDaily((d) => advanceDaily(advanceDaily(d, { type: "harvest", plants: 1 }), { type: "earn", coins: res.earned! }));
+        setDaily((d) => {
+          const next = advanceDaily(advanceDaily(d, { type: "harvest", plants: 1 }), { type: "earn", coins: res.earned! });
+          return advanceOrders(next, harvestedPlant);
+        });
         sfx.harvest();
         if (res.bonus) {
           sfx.coin();
@@ -237,6 +245,18 @@ export default function App() {
     [daily, state.decorations, showToast]
   );
 
+  const onClaimOrder = useCallback(
+    (index: number) => {
+      const res = claimOrder(daily, index);
+      if (!res) return;
+      setDaily(res.state);
+      setState((s) => ({ ...s, coins: s.coins + res.reward, totalEarned: s.totalEarned + res.reward }));
+      sfx.coin();
+      showToast(`📦 訂單完成！+${res.reward} 金幣`);
+    },
+    [daily, showToast]
+  );
+
   const onClaimMilestone = useCallback(
     (id: string) => {
       const res = claimMilestone(state, id);
@@ -352,6 +372,10 @@ export default function App() {
           sfx.select();
           setTasksOpen(true);
         }}
+        onBook={() => {
+          sfx.select();
+          setBookOpen(true);
+        }}
         onToggleSound={toggleSound}
       />
       <Garden state={state} canPlant={hasHand} floater={floater} onPlotTap={onPlotTap} />
@@ -397,11 +421,13 @@ export default function App() {
           daily={daily}
           game={state}
           onClaim={onClaimTask}
+          onClaimOrder={onClaimOrder}
           onClaimMilestone={onClaimMilestone}
           onCheckIn={onCheckIn}
           onClose={() => setTasksOpen(false)}
         />
       )}
+      {bookOpen && <PlantBook game={state} onClose={() => setBookOpen(false)} />}
       <Toolbar
         onWater={onWaterTap}
         onShop={() => {

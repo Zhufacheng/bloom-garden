@@ -1,6 +1,6 @@
 import type { DailyState } from "./daily";
 import { newGame, stepState } from "./logic";
-import { emptySeeds } from "./plants";
+import { emptyCounts, emptySeeds } from "./plants";
 import type { GameState } from "./types";
 import { tickWeather } from "./weather";
 
@@ -50,6 +50,7 @@ export function loadGame(): GameState {
       checkInStreak: parsed.checkInStreak ?? 0,
       dew: parsed.dew ?? 0,
       coinBoostUntil: parsed.coinBoostUntil ?? 0,
+      harvestCounts: { ...emptyCounts(), ...(parsed.harvestCounts ?? {}) },
     };
     merged.plots = merged.plots.map((p) => ({ ...p, golden: p.golden ?? false, boost: p.boost ?? 1 }));
     return tickWeather(stepState({ ...merged, savedAt: now }, dt), now);

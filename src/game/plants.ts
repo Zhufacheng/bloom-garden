@@ -56,3 +56,8 @@ export function emptySeeds(): Record<PlantId, number> {
     rainbowflower: 0,
   };
 }
+
+/** zeroed per-plant counters (plant book) */
+export function emptyCounts(): Record<PlantId, number> {
+  return { ...emptySeeds() };
+}

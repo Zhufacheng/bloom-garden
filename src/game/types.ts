@@ -73,6 +73,8 @@ export interface GameState {
   dew: number;
   /** epoch ms until which harvest coins are doubled (golden hour event) */
   coinBoostUntil: number;
+  /** lifetime harvest count per plant (plant book; survives prestige) */
+  harvestCounts: Record<PlantId, number>;
   /** epoch ms of last save */
   savedAt: number;
 }

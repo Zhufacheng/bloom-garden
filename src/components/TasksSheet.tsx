@@ -1,5 +1,6 @@
 import { allClaimed, todayStr, yesterdayStr, type DailyState } from "../game/daily";
 import { CHECKIN_REWARDS, MILESTONES } from "../game/logic";
+import { PLANTS } from "../game/plants";
 import type { GameState } from "../game/types";
 import { CoinIcon } from "./Icons";
 
@@ -7,12 +8,13 @@ interface Props {
   daily: DailyState;
   game: GameState;
   onClaim: (index: number) => void;
+  onClaimOrder: (index: number) => void;
   onClaimMilestone: (id: string) => void;
   onCheckIn: () => void;
   onClose: () => void;
 }
 
-export default function TasksSheet({ daily, game, onClaim, onClaimMilestone, onCheckIn, onClose }: Props) {
+export default function TasksSheet({ daily, game, onClaim, onClaimOrder, onClaimMilestone, onCheckIn, onClose }: Props) {
   const today = todayStr();
   const yesterday = yesterdayStr();
   const claimedToday = game.lastCheckIn === today;
@@ -83,6 +85,37 @@ export default function TasksSheet({ daily, game, onClaim, onClaimMilestone, onC
         })}
         {allClaimed(daily) && <div className="tasks-done">🎉 全部完成！明天回來領新任務</div>}
         <div className="tasks-note">任務每天 0 點自動更新，進度只算當天</div>
+
+        <div className="section-title">鄰里訂單（收獲指定植物，換比市場更高的賞金）</div>
+        {daily.orders.map((o, i) => {
+          const def = PLANTS[o.plant];
+          const done = o.progress >= o.count;
+          return (
+            <div key={o.id} className={`task-item${o.claimed ? " claimed" : ""}`}>
+              <span className="task-icon">{o.claimed ? "✅" : done ? "🌟" : "📦"}</span>
+              <span className="info">
+                <span className="name">
+                  {def.name} ×{o.count} <small>鄰里訂單</small>
+                </span>
+                <span className="task-bar">
+                  <span style={{ width: `${Math.min(100, (o.progress / o.count) * 100)}%` }} />
+                </span>
+                <span className="meta">
+                  {o.progress}/{o.count}
+                  {o.claimed ? " · 已領獎" : done ? " · 可領獎" : " · 收獲該植物即計入"}
+                </span>
+              </span>
+              <button
+                className={`claim-btn${o.claimed ? " done" : ""}`}
+                disabled={!done || o.claimed}
+                onClick={() => onClaimOrder(i)}
+              >
+                <CoinIcon size={13} /> +{o.reward}
+              </button>
+            </div>
+          );
+        })}
+        <div className="tasks-note">訂單賞金 = 基準賣價 ×1.5，每天 0 點換新訂單</div>
 
         <div className="section-title">成就（一次性獎勵，達成後可領）</div>
         {MILESTONES.map((m) => {
