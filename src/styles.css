@@ -37,7 +37,7 @@ button {
 }
 
 .app {
-  max-width: 460px;
+  max-width: 600px;
   margin: 0 auto;
   padding: calc(env(safe-area-inset-top) + 10px) 14px calc(env(safe-area-inset-bottom) + 110px);
   display: flex;
@@ -697,7 +697,7 @@ button {
   left: 50%;
   transform: translateX(-50%);
   width: 100%;
-  max-width: 460px;
+  max-width: 600px;
   padding: 10px 14px calc(12px + env(safe-area-inset-bottom));
   background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(12px);
@@ -762,7 +762,7 @@ button {
 
 .sheet {
   width: 100%;
-  max-width: 460px;
+  max-width: 600px;
   background: #fff;
   border-radius: 24px 24px 0 0;
   max-height: 84dvh;
