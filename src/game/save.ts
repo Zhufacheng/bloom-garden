@@ -42,8 +42,10 @@ export function loadGame(): GameState {
       weatherUntil: parsed.weatherUntil ?? now + 180_000,
       decorations: { ...fresh.decorations, ...(parsed.decorations ?? {}) },
       milestones: parsed.milestones ?? [],
+      nextEventAt: parsed.nextEventAt ?? now + 90_000,
+      growthBoostUntil: parsed.growthBoostUntil ?? 0,
     };
-    merged.plots = merged.plots.map((p) => ({ ...p, golden: p.golden ?? false }));
+    merged.plots = merged.plots.map((p) => ({ ...p, golden: p.golden ?? false, boost: p.boost ?? 1 }));
     return tickWeather(stepState({ ...merged, savedAt: now }, dt), now);
   } catch {
     return newGame();

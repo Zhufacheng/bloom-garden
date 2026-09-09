@@ -221,6 +221,28 @@ button {
   white-space: nowrap;
 }
 
+.head-chips {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.rainbow-chip {
+  background: linear-gradient(90deg, #e1bee7, #b2dfdb, #fff9c4);
+  color: #4a148c;
+  animation: rainbowPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes rainbowPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 4px rgba(186, 104, 200, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 10px rgba(186, 104, 200, 0.7);
+  }
+}
+
 .garden-sub {
   font-size: 12px;
   font-weight: 700;
@@ -712,6 +734,22 @@ button {
   cursor: default;
 }
 
+.shop-item.mystery {
+  background: linear-gradient(135deg, #f3e5f5, #ede7f6);
+  border-color: #ce93d8;
+  animation: mysteryGlow 2.4s ease-in-out infinite;
+}
+
+@keyframes mysteryGlow {
+  0%,
+  100% {
+    box-shadow: 0 2px 6px rgba(173, 20, 107, 0.15);
+  }
+  50% {
+    box-shadow: 0 2px 14px rgba(173, 20, 107, 0.35);
+  }
+}
+
 .shop-item .buy-btn {
   flex: none;
   display: flex;
@@ -735,6 +773,22 @@ button {
 
 .stock {
   color: var(--green-700);
+}
+
+.mkt.up {
+  color: #2e7d32;
+}
+
+.mkt.down {
+  color: #c62828;
+}
+
+.shop-item .meta .price.up {
+  color: #2e7d32;
+}
+
+.shop-item .meta .price.down {
+  color: #c62828;
 }
 
 .shop-item .icon {

@@ -30,8 +30,11 @@ export default function Garden({ state, canPlant, floater, onPlotTap }: Props) {
         <span>
           🌻 我的花園 <span className="garden-sub">{state.rows}×{COLUMNS}</span>
         </span>
-        <span className="weather-chip" title={wx.hint}>
-          {wx.icon} {wx.label} · {wx.hint}
+        <span className="head-chips">
+          {Date.now() < state.growthBoostUntil && <span className="weather-chip rainbow-chip">🌈 生長加速中</span>}
+          <span className="weather-chip" title={wx.hint}>
+            {wx.icon} {wx.label} · {wx.hint}
+          </span>
         </span>
       </div>
       {ownedDecos.length > 0 && (

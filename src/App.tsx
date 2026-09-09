@@ -14,7 +14,20 @@ import {
   type DailyState,
 } from "./game/daily";
 import { DECOS } from "./game/decor";
-import { buyDeco, buySeed, claimMilestone, harvest, isMature, isUnlocked, plantSeed, stepState, unlockNextRow, waterPlot } from "./game/logic";
+import {
+  buyDeco,
+  buyMysterySeed,
+  buySeed,
+  claimMilestone,
+  harvest,
+  isMature,
+  isUnlocked,
+  plantSeed,
+  stepState,
+  tickEvents,
+  unlockNextRow,
+  waterPlot,
+} from "./game/logic";
 import { PLANTS } from "./game/plants";
 import { loadDaily, loadGame, resetGame, saveDaily, saveGame } from "./game/save";
 import type { DecoId, GameState, PlantId } from "./game/types";
@@ -41,7 +54,15 @@ export default function App() {
 
   useEffect(() => {
     const t = window.setInterval(() => {
-      setState((s) => stepState(tickWeather(s, Date.now()), 1));
+      let eventMsg: string | null = null;
+      setState((s) => {
+        const now = Date.now();
+        const ev = tickEvents(tickWeather(s, now), now);
+        eventMsg = ev.msg;
+        const speed = now < ev.state.growthBoostUntil ? 1.3 : 1;
+        return stepState(ev.state, 1, speed);
+      });
+      if (eventMsg) showToast(eventMsg);
       setDaily((d) => ensureDaily(d, todayStr()));
     }, 1000);
     return () => window.clearInterval(t);
@@ -223,6 +244,19 @@ export default function App() {
     [state, showToast]
   );
 
+  const onBuyMystery = useCallback(() => {
+    const res = buyMysterySeed(state);
+    if (res.error || !res.plant) {
+      sfx.error();
+      showToast(res.error ?? "抽不到神秘種子");
+      return;
+    }
+    setState(res.state!);
+    setHand(res.plant);
+    sfx.unlock();
+    showToast(`🎲 抽到：${PLANTS[res.plant].name}種子！點空地種下它`);
+  }, [state, showToast]);
+
   const onBuyDeco = useCallback(
     (deco: DecoId) => {
       const res = buyDeco(state, deco);
@@ -298,6 +332,7 @@ export default function App() {
           selected={hasHand ? hand : null}
           onBuy={onBuySeed}
           onSelect={onSelectSeed}
+          onBuyMystery={onBuyMystery}
           onBuyDeco={onBuyDeco}
           onUnlockRow={onUnlockRow}
           onReset={onReset}

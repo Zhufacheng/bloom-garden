@@ -1,4 +1,7 @@
+import { todayStr } from "../game/daily";
 import { DECOS } from "../game/decor";
+import { MYSTERY_COST } from "../game/logic";
+import { marketMult } from "../game/market";
 import { MAX_ROWS, PLANT_LIST, ROW_COSTS } from "../game/plants";
 import type { DecoId, GameState, PlantId } from "../game/types";
 import { CoinIcon } from "./Icons";
@@ -9,13 +12,16 @@ interface Props {
   selected: PlantId | null;
   onBuy: (p: PlantId) => void;
   onSelect: (p: PlantId) => void;
+  onBuyMystery: () => void;
   onBuyDeco: (d: DecoId) => void;
   onUnlockRow: () => void;
   onReset: () => void;
   onClose: () => void;
 }
 
-export default function Shop({ state, selected, onBuy, onSelect, onBuyDeco, onUnlockRow, onReset, onClose }: Props) {
+export default function Shop({ state, selected, onBuy, onSelect, onBuyMystery, onBuyDeco, onUnlockRow, onReset, onClose }: Props) {
+  const today = todayStr();
+
   return (
     <div className="sheet-overlay" onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
@@ -27,9 +33,22 @@ export default function Shop({ state, selected, onBuy, onSelect, onBuyDeco, onUn
           </button>
         </div>
 
-        <div className="section-title">植物種子（可多買，點卡片拿起，再點空地連續種）</div>
+        <div className="section-title">植物種子（賣價每天隨市場波動，點卡片拿起，再點空地連續種）</div>
+        <div className="shop-item mystery" onClick={onBuyMystery}>
+          <span className="icon-emoji">🎲</span>
+          <span className="info">
+            <span className="name">神秘種子 <small>Mystery</small></span>
+            <span className="meta">隨機抽 1 顆種子，可能抽到昂貴的玫瑰！</span>
+          </span>
+          <button className="buy-btn" onClick={(e) => { e.stopPropagation(); onBuyMystery(); }}>
+            <CoinIcon size={13} /> {MYSTERY_COST}
+          </button>
+        </div>
         {PLANT_LIST.map((def) => {
           const stock = state.seeds[def.id] ?? 0;
+          const mult = marketMult(def.id, today);
+          const price = Math.round(def.sellValue * mult);
+          const arrow = mult > 1.05 ? <span className="mkt up">▲</span> : mult < 0.95 ? <span className="mkt down">▼</span> : null;
           return (
             <div
               key={def.id}
@@ -44,7 +63,7 @@ export default function Shop({ state, selected, onBuy, onSelect, onBuyDeco, onUn
                   {def.name} <small>{def.nameEn}</small>
                 </span>
                 <span className="meta">
-                  成熟 {def.growTime} 秒 · 賣出 +{def.sellValue}
+                  成熟 {def.growTime} 秒 · 今天賣 <b className={`price${mult > 1.05 ? " up" : mult < 0.95 ? " down" : ""}`}>{price}</b> {arrow}
                   {def.noWater && " · 免澆水"}
                   {stock > 0 && <b className="stock"> · 庫存 ×{stock}</b>}
                 </span>

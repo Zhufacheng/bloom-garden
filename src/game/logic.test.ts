@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  MYSTERY_COST,
   buyDeco,
+  buyMysterySeed,
   buySeed,
   claimMilestone,
   harvest,
@@ -9,13 +11,18 @@ import {
   plantSeed,
   sellValueOf,
   stepState,
+  tickEvents,
   unlockNextRow,
   waterPlot,
 } from "./logic";
 import { emptyDecorations } from "./decor";
+import { marketMult } from "./market";
 import { COLUMNS, emptySeeds } from "./plants";
 import type { DecoId, GameState, Plot } from "./types";
 import { rollWeather, tickWeather } from "./weather";
+
+/** fixed date so market prices are deterministic in tests */
+const D = "2026-09-09";
 
 describe("newGame", () => {
   it("starts with 30 coins, 3x3 unlocked plots, 15 plots total, 5 free grass seeds", () => {
@@ -82,12 +89,12 @@ const matureAt = (s: GameState, i: number, patch: Partial<Plot> = {}): GameState
 describe("golden plants", () => {
   it("sell for double", () => {
     const s = matureAt(plantSeed({ ...newGame(), ...sunny }, 0, "grass")!.state!, 0, { golden: true });
-    expect(harvest(s, 0).earned).toBe(24); // grass 12 x2
+    expect(harvest(s, 0, D).earned).toBe(Math.round(Math.round(12 * marketMult("grass", D)) * 2)); // grass 12 x2
   });
 
   it("non-golden sells normally", () => {
     const s = matureAt(plantSeed({ ...newGame(), ...sunny }, 0, "grass")!.state!, 0);
-    expect(harvest(s, 0).earned).toBe(12);
+    expect(harvest(s, 0, D).earned).toBe(Math.round(12 * marketMult("grass", D)));
   });
 });
 
@@ -97,8 +104,9 @@ describe("decorations", () => {
 
   it("butterfly adds 10% to sell value", () => {
     const s = { ...newGame(), decorations: withDeco({ butterfly: true }) };
-    expect(sellValueOf(s, "daisy", false)).toBe(33); // round(30 * 1.1)
-    expect(sellValueOf(s, "daisy", true)).toBe(66); // round(30 * 1.1 * 2)
+    const m = marketMult("daisy", D);
+    expect(sellValueOf(s, "daisy", false, D)).toBe(Math.round(30 * m * 1.1));
+    expect(sellValueOf(s, "daisy", true, D)).toBe(Math.round(30 * m * 1.1 * 2));
   });
 
   it("fountain slows water drain by 25%", () => {
@@ -283,12 +291,13 @@ describe("harvest", () => {
   it("harvests a mature plant for coins and clears the plot", () => {
     let s = plantSeed(newGame(), 0, "grass")!.state!;
     s = stepState(s, 20);
-    const r = harvest(s, 0);
-    expect(r.earned).toBe(12);
-    expect(r.state!.coins).toBe(30 + 12); // starter grass seed costs nothing
+    const expected = Math.round(12 * marketMult("grass", D));
+    const r = harvest(s, 0, D);
+    expect(r.earned).toBe(expected);
+    expect(r.state!.coins).toBe(30 + expected); // starter grass seed costs nothing
     expect(r.state!.plots[0].plant).toBeNull();
     expect(r.state!.totalHarvested).toBe(1);
-    expect(r.state!.totalEarned).toBe(12);
+    expect(r.state!.totalEarned).toBe(expected);
   });
 
   it("refuses an immature plant", () => {
@@ -342,5 +351,114 @@ describe("unlockNextRow", () => {
     const s = { ...newGame(), rows: 5, coins: 999 };
     const r = unlockNextRow(s);
     expect(r.error).toBeDefined();
+  });
+});
+
+describe("daily market", () => {
+  it("multiplier is deterministic and within ±25%", () => {
+    const a = marketMult("tulip", D);
+    expect(marketMult("tulip", D)).toBe(a);
+    expect(a).toBeGreaterThanOrEqual(0.75);
+    expect(a).toBeLessThanOrEqual(1.25);
+  });
+
+  it("prices differ across days", () => {
+    const prices = ["2026-09-09", "2026-09-10", "2026-09-11"].map((d) => marketMult("rose", d));
+    expect(new Set(prices).size).toBeGreaterThan(1);
+  });
+
+  it("sellValueOf reflects the market", () => {
+    const s = newGame();
+    const m = marketMult("grass", D);
+    expect(sellValueOf(s, "grass", false, D)).toBe(Math.round(12 * m));
+  });
+});
+
+describe("buyMysterySeed", () => {
+  it("buys a deterministic plant with a fixed rng", () => {
+    const s = { ...newGame(), coins: 50 };
+    const r = buyMysterySeed(s, () => 0); // PLANT_LIST[0] = grass
+    expect(r.plant).toBe("grass");
+    expect(r.state!.seeds.grass).toBe(6); // 5 starter + 1
+    expect(r.state!.coins).toBe(50 - MYSTERY_COST);
+  });
+
+  it("refuses when coins are short", () => {
+    const r = buyMysterySeed({ ...newGame(), coins: 20 });
+    expect(r.error).toBeDefined();
+  });
+});
+
+describe("stepState speed (rainbow)", () => {
+  it("1.3x speed grows 1.3x faster without changing drain", () => {
+    const s = plantSeed({ ...newGame(), ...sunny }, 0, "grass")!.state!;
+    const after = stepState(s, 10, 1.3);
+    expect(after.plots[0].progress).toBeCloseTo(0.65, 5); // (10/20)*1.3
+    expect(after.plots[0].water).toBeCloseTo(0.75, 5); // drain unchanged
+  });
+});
+
+describe("harvest boost (bee)", () => {
+  it("boosted plot earns 1.5x", () => {
+    const s = matureAt(plantSeed({ ...newGame(), ...sunny }, 0, "grass")!.state!, 0, { boost: 1.5 });
+    const expected = Math.round(Math.round(12 * marketMult("grass", D)) * 1.5);
+    expect(harvest(s, 0, D).earned).toBe(expected);
+  });
+});
+
+describe("tickEvents", () => {
+  const due = () => ({ ...newGame(), nextEventAt: Date.now() - 1 });
+
+  function seq(...vals: number[]) {
+    let i = 0;
+    return () => vals[i++ % vals.length];
+  }
+
+  it("does nothing before the next roll", () => {
+    const s = { ...newGame(), nextEventAt: Date.now() + 60_000 };
+    const r = tickEvents(s, Date.now());
+    expect(r.state).toBe(s);
+    expect(r.msg).toBeNull();
+  });
+
+  it("shower refills water on growing plants", () => {
+    let s = due();
+    s = plantSeed(s, 0, "grass")!.state!;
+    s = { ...s, plots: s.plots.map((p, i) => (i === 0 ? { ...p, water: 0.2, progress: 0.5 } : p)) };
+    const r = tickEvents(s, Date.now(), seq(0.5, 0.5, 0.5)); // delay, event, shower band
+    expect(r.msg).toContain("快閃雨");
+    expect(r.state.plots[0].water).toBe(1);
+    expect(r.state.nextEventAt).toBeGreaterThan(Date.now());
+  });
+
+  it("bee boosts one mature plot by 1.5x", () => {
+    let s = due();
+    s = plantSeed(s, 0, "grass")!.state!;
+    s = { ...s, plots: s.plots.map((p, i) => (i === 0 ? { ...p, progress: 1 } : p)) };
+    const r = tickEvents(s, Date.now(), seq(0.5, 0.5, 0.1, 0)); // delay, event, bee band, first mature
+    expect(r.msg).toContain("蜜蜂");
+    expect(r.state.plots[0].boost).toBe(1.5);
+  });
+
+  it("rainbow speeds up growth for 60s", () => {
+    const s = due();
+    const r = tickEvents(s, Date.now(), seq(0.5, 0.5, 0.9)); // delay, event, rainbow
+    expect(r.msg).toContain("彩虹");
+    expect(r.state.growthBoostUntil).toBeGreaterThan(Date.now());
+  });
+
+  it("a calm roll keeps state but reschedules", () => {
+    const s = due();
+    const r = tickEvents(s, Date.now(), seq(0.5, 0.1)); // delay, calm
+    expect(r.msg).toBeNull();
+    expect(r.state).not.toBe(s);
+    expect(r.state.nextEventAt).toBeGreaterThan(Date.now());
+  });
+
+  it("bee with no mature plants falls back to a calm roll", () => {
+    const s = due();
+    const r = tickEvents(s, Date.now(), seq(0.5, 0.5, 0.1)); // delay, event, bee band (none mature)
+    expect(r.msg).toBeNull();
+    expect(r.state.nextEventAt).toBeGreaterThan(Date.now());
   });
 });

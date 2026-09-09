@@ -1,5 +1,7 @@
 import { DECOS, emptyDecorations } from "./decor";
-import { COLUMNS, MAX_ROWS, PLANTS, ROW_COSTS, START_ROWS, emptySeeds } from "./plants";
+import { todayStr } from "./daily";
+import { marketMult } from "./market";
+import { COLUMNS, MAX_ROWS, PLANTS, PLANT_LIST, ROW_COSTS, START_ROWS, emptySeeds } from "./plants";
 import { DRAIN_RATES, REFILL_RATES, rollWeather } from "./weather";
 import type { DecoId, GameState, PlantId, Plot } from "./types";
 
@@ -9,8 +11,11 @@ export const WATER_DRAIN_PER_SEC = 1 / 40;
 /** chance a plant turns golden (2x value) when it matures */
 export const GOLDEN_CHANCE = 0.1;
 
+/** price of one mystery (random) seed */
+export const MYSTERY_COST = 25;
+
 export function createPlot(id: number): Plot {
-  return { id, plant: null, progress: 0, water: 0, golden: false };
+  return { id, plant: null, progress: 0, water: 0, golden: false, boost: 1 };
 }
 
 export function newGame(): GameState {
@@ -24,6 +29,8 @@ export function newGame(): GameState {
     ...rollWeather(Date.now()),
     decorations: emptyDecorations(),
     milestones: [],
+    nextEventAt: Date.now() + 90_000,
+    growthBoostUntil: 0,
     savedAt: Date.now(),
   };
 }
@@ -40,9 +47,10 @@ export function isUnlocked(s: GameState, index: number): boolean {
  * Advance growth for dt seconds. Pure: returns a new state.
  * Growth only progresses while water > 0; water drains only while growing.
  * Weather drives the drain rate (hot = 2x, rain = 0) and rain refills water.
+ * `speed` multiplies growth rate (rainbow event = 1.3).
  * Analytic (closed-form), so offline catch-up is exact for one weather state.
  */
-export function stepState(s: GameState, dt: number): GameState {
+export function stepState(s: GameState, dt: number, speed = 1): GameState {
   if (dt <= 0) return s;
   const fountain = s.decorations.fountain;
   const rate = DRAIN_RATES[s.weather] * (fountain ? 0.75 : 1);
@@ -53,10 +61,10 @@ export function stepState(s: GameState, dt: number): GameState {
     const def = PLANTS[p.plant];
     let { progress, water } = p;
     if (progress < 1) {
-      const tToBloom = (1 - progress) * def.growTime;
+      const tToBloom = ((1 - progress) * def.growTime) / speed;
       const tDry = def.noWater || rate === 0 ? Infinity : water / rate;
       const tGrow = Math.min(dt, tToBloom, tDry);
-      progress = Math.min(1, progress + tGrow / def.growTime);
+      progress = Math.min(1, progress + (tGrow / def.growTime) * speed);
       if (rate > 0 && !def.noWater) water = Math.max(0, water - tGrow * rate);
     }
     if (refill > 0) water = Math.min(1, water + refill * dt);
@@ -86,6 +94,19 @@ export function buySeed(s: GameState, plant: PlantId): { state?: GameState; erro
   };
 }
 
+/** Buy a mystery seed: a random plant from the full catalog. */
+export function buyMysterySeed(
+  s: GameState,
+  rnd: () => number = Math.random,
+): { state?: GameState; plant?: PlantId; error?: string } {
+  if (s.coins < MYSTERY_COST) return { error: `金幣不夠，神秘種子要 ${MYSTERY_COST}` };
+  const plant = PLANT_LIST[Math.floor(rnd() * PLANT_LIST.length)].id;
+  return {
+    state: { ...s, coins: s.coins - MYSTERY_COST, seeds: { ...s.seeds, [plant]: (s.seeds[plant] ?? 0) + 1 } },
+    plant,
+  };
+}
+
 /** Plant one seed from the stash onto an empty plot. */
 export function plantSeed(s: GameState, index: number, plant: PlantId): { state?: GameState; error?: string } {
   if (!isUnlocked(s, index)) return { error: "這塊土地還沒解鎖喔" };
@@ -98,16 +119,21 @@ export function plantSeed(s: GameState, index: number, plant: PlantId): { state?
   return { state: { ...s, plots, seeds: { ...s.seeds, [plant]: s.seeds[plant] - 1 } } };
 }
 
-export function sellValueOf(s: GameState, plant: PlantId, golden: boolean): number {
-  const base = PLANTS[plant].sellValue * (s.decorations.butterfly ? 1.1 : 1);
+/** Sell price today: base value x daily market x butterfly, doubled if golden. */
+export function sellValueOf(s: GameState, plant: PlantId, golden: boolean, date = todayStr()): number {
+  const base = PLANTS[plant].sellValue * marketMult(plant, date) * (s.decorations.butterfly ? 1.1 : 1);
   return Math.round(base * (golden ? 2 : 1));
 }
 
-export function harvest(s: GameState, index: number): { state?: GameState; earned?: number; golden?: boolean; error?: string } {
+export function harvest(
+  s: GameState,
+  index: number,
+  date = todayStr(),
+): { state?: GameState; earned?: number; golden?: boolean; error?: string } {
   const p = s.plots[index];
   if (!p.plant) return { error: "這裡沒有植物" };
   if (!isMature(p)) return { error: "還沒成熟，再澆點水等等它 🌱" };
-  const earned = sellValueOf(s, p.plant, p.golden);
+  const earned = Math.round(sellValueOf(s, p.plant, p.golden, date) * p.boost);
   const plots = s.plots.slice();
   plots[index] = { ...createPlot(index) };
   return {
@@ -120,6 +146,41 @@ export function harvest(s: GameState, index: number): { state?: GameState; earne
     },
     earned,
     golden: p.golden,
+  };
+}
+
+/**
+ * Roll a random event when due. Returns the new state and an optional
+ * toast message. Events: bee (a mature plant gets a one-time +50% harvest),
+ * shower (all growing plants get refilled), rainbow (+30% growth for 60s).
+ * ~35% of rolls are calm. Always reschedules the next roll 60-180s out.
+ */
+export function tickEvents(
+  s: GameState,
+  now: number,
+  rnd: () => number = Math.random,
+): { state: GameState; msg: string | null } {
+  if (now < s.nextEventAt) return { state: s, msg: null };
+  const next = now + 60_000 + rnd() * 120_000;
+  if (rnd() < 0.35) return { state: { ...s, nextEventAt: next }, msg: null };
+  const r = rnd();
+  if (r < 0.4) {
+    const mature = s.plots.map((p, i) => ({ p, i })).filter(({ p }) => isMature(p));
+    if (mature.length === 0) return { state: { ...s, nextEventAt: next }, msg: null };
+    const pick = mature[Math.floor(rnd() * mature.length)];
+    const plots = s.plots.slice();
+    plots[pick.i] = { ...pick.p, boost: 1.5 };
+    return { state: { ...s, plots, nextEventAt: next }, msg: "🐝 蜜蜂來採蜜了！標記的花收獲 +50%" };
+  }
+  if (r < 0.7) {
+    const plots = s.plots.map((p) =>
+      p.plant && p.progress < 1 && !PLANTS[p.plant].noWater ? { ...p, water: 1 } : p,
+    );
+    return { state: { ...s, plots, nextEventAt: next }, msg: "🌦️ 快閃雨！所有植物水分補滿" };
+  }
+  return {
+    state: { ...s, growthBoostUntil: now + 60_000, nextEventAt: next },
+    msg: "🌈 彩虹出現！60 秒內所有植物生長 +30%",
   };
 }
 

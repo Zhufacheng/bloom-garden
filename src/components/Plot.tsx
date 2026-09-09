@@ -38,6 +38,7 @@ export default function Plot({ plot, index, locked, lockCost, canPlant, floater,
 
   const mature = isMature(plot);
   const golden = plot.plant !== null && plot.golden;
+  const boosted = plot.boost > 1;
   const noWater = plot.plant !== null && PLANTS[plot.plant].noWater;
   const stage = plot.plant ? stageOf(plot.progress) : "seed";
 
@@ -58,7 +59,9 @@ export default function Plot({ plot, index, locked, lockCost, canPlant, floater,
         </span>
       )}
       {mature && (
-        <span className={`harvest-badge${golden ? " golden" : ""}`}>{golden ? "✨ 金色 ×2" : "收獲"}</span>
+        <span className={`harvest-badge${golden || boosted ? " golden" : ""}`}>
+          {golden && boosted ? "✨🐝 ×3" : golden ? "✨ 金色 ×2" : boosted ? "🐝 +50%" : "收獲"}
+        </span>
       )}
       {plot.plant && (
         <span

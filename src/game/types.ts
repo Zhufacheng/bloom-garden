@@ -25,6 +25,8 @@ export interface Plot {
   water: number;
   /** rare golden variant: sells for double, decided when the plant matures */
   golden: boolean;
+  /** one-time harvest multiplier (bee event), 1 = none */
+  boost: number;
 }
 
 export interface GameState {
@@ -43,6 +45,10 @@ export interface GameState {
   decorations: Record<DecoId, boolean>;
   /** ids of claimed milestones */
   milestones: string[];
+  /** epoch ms of the next random event roll */
+  nextEventAt: number;
+  /** epoch ms until which all growth is sped up (rainbow event) */
+  growthBoostUntil: number;
   /** epoch ms of last save */
   savedAt: number;
 }
