@@ -185,15 +185,28 @@ interface WorldProps {
   zoomRef: { current: number };
 }
 
-/** keeps the camera aimed at the garden and eases in pinch/wheel zoom */
+/**
+ * Keeps the camera aimed at the garden and frames it to fill the view in both
+ * orientations. Wide/landscape keeps the low 3/4 angle (the "normal" look);
+ * as the viewport gets narrow/portrait the camera rises toward a top-down
+ * angle so the grid fills the tall frame instead of sitting small under a
+ * strip of sky. eases in pinch/wheel zoom.
+ */
 function CameraRig({ zoomRef }: { zoomRef: { current: number } }) {
-  const { camera } = useThree();
+  const { camera, size } = useThree();
   useFrame((_, delta) => {
-    const z = zoomRef.current;
+    const aspect = size.height > 0 ? size.width / size.height : 1;
+    // 0 = wide/landscape (base 3/4 view), 1 = narrow/portrait (near top-down)
+    const t = THREE.MathUtils.clamp((1.2 - aspect) / 0.6, 0, 1);
+    const pitch = THREE.MathUtils.degToRad(THREE.MathUtils.lerp(39, 78, t));
+    const dist = 9.75 * zoomRef.current;
+    const targetY = 0.5;
+    const camY = targetY + dist * Math.sin(pitch);
+    const camZ = dist * Math.cos(pitch);
     camera.position.x = THREE.MathUtils.damp(camera.position.x, 0, 6, delta);
-    camera.position.y = THREE.MathUtils.damp(camera.position.y, 6.6 * z, 6, delta);
-    camera.position.z = THREE.MathUtils.damp(camera.position.z, 7.6 * z, 6, delta);
-    camera.lookAt(0, 0.5, 0);
+    camera.position.y = THREE.MathUtils.damp(camera.position.y, camY, 6, delta);
+    camera.position.z = THREE.MathUtils.damp(camera.position.z, camZ, 6, delta);
+    camera.lookAt(0, targetY, 0);
   });
   return null;
 }
