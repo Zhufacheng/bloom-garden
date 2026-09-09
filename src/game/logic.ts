@@ -35,8 +35,14 @@ export const PRESTIGE_BASE = 200;
 /** permanent sell-value bonus per dew (5% each, additive) */
 export const DEW_SELL_BONUS = 0.05;
 
+/** price of one fertilizer (next planted plant grows 2x faster) */
+export const FERTILIZER_COST = 40;
+
+/** max fertilizer that can be stored in the shed */
+export const FERTILIZER_MAX = 5;
+
 export function createPlot(id: number): Plot {
-  return { id, plant: null, progress: 0, water: 0, golden: false, boost: 1 };
+  return { id, plant: null, progress: 0, water: 0, golden: false, boost: 1, fertilized: false };
 }
 
 export function newGame(): GameState {
@@ -59,6 +65,8 @@ export function newGame(): GameState {
     dew: 0,
     coinBoostUntil: 0,
     harvestCounts: emptyCounts(),
+    fertilizer: 0,
+    bestCombo: 0,
     savedAt: Date.now(),
   };
 }
@@ -95,10 +103,11 @@ export function stepState(s: GameState, dt: number, speed = 1): GameState {
     const def = PLANTS[p.plant];
     let { progress, water } = p;
     if (progress < 1) {
-      const tToBloom = ((1 - progress) * def.growTime) / speed;
+      const growTime = p.fertilized ? def.growTime / 2 : def.growTime;
+      const tToBloom = ((1 - progress) * growTime) / speed;
       const tDry = def.noWater || rate === 0 ? Infinity : water / rate;
       const tGrow = Math.min(dt, tToBloom, tDry);
-      progress = Math.min(1, progress + (tGrow / def.growTime) * speed);
+      progress = Math.min(1, progress + (tGrow / growTime) * speed);
       if (rate > 0 && !def.noWater) water = Math.max(0, water - tGrow * rate);
     }
     if (refill > 0) water = Math.min(1, water + refill * dt);
@@ -154,16 +163,31 @@ export function buyPremiumSeed(
   };
 }
 
-/** Plant one seed from the stash onto an empty plot. */
+/** Plant one seed from the stash onto an empty plot; fertilizer (if any) is auto-applied. */
 export function plantSeed(s: GameState, index: number, plant: PlantId): { state?: GameState; error?: string } {
   if (!isUnlocked(s, index)) return { error: "這塊土地還沒解鎖喔" };
   const p = s.plots[index];
   if (p.plant) return { error: "這裡已經種了東西" };
   const def = PLANTS[plant];
   if ((s.seeds[plant] ?? 0) <= 0) return { error: `手上沒有${def.name}種子` };
+  const fert = s.fertilizer > 0;
   const plots = s.plots.slice();
-  plots[index] = { ...p, plant, progress: 0, water: def.noWater ? 0 : 1 };
-  return { state: { ...s, plots, seeds: { ...s.seeds, [plant]: s.seeds[plant] - 1 } } };
+  plots[index] = { ...p, plant, progress: 0, water: def.noWater ? 0 : 1, fertilized: fert };
+  return {
+    state: {
+      ...s,
+      plots,
+      fertilizer: fert ? s.fertilizer - 1 : s.fertilizer,
+      seeds: { ...s.seeds, [plant]: s.seeds[plant] - 1 },
+    },
+  };
+}
+
+/** Buy fertilizer: the next plants you sow grow twice as fast (max FERTILIZER_MAX stored). */
+export function buyFertilizer(s: GameState): { state?: GameState; error?: string } {
+  if (s.fertilizer >= FERTILIZER_MAX) return { error: `肥料已經滿了（最多 ${FERTILIZER_MAX} 袋）` };
+  if (s.coins < FERTILIZER_COST) return { error: `金幣不夠，肥料要 ${FERTILIZER_COST}` };
+  return { state: { ...s, coins: s.coins - FERTILIZER_COST, fertilizer: s.fertilizer + 1 } };
 }
 
 /** Sell price today: base x daily market x dew bonus x butterfly, doubled if golden. */
@@ -203,6 +227,7 @@ export function harvest(
       harvestCounts: { ...s.harvestCounts, [p.plant]: (s.harvestCounts[p.plant] ?? 0) + 1 },
       combo,
       comboUntil: now + COMBO_WINDOW_MS,
+      bestCombo: Math.max(s.bestCombo, combo),
     },
     earned,
     bonus,
@@ -232,9 +257,13 @@ export function tickEvents(
     const mature = s.plots.map((p, i) => ({ p, i })).filter(({ p }) => isMature(p));
     if (mature.length === 0) return { state: { ...s, nextEventAt: next }, msg: null };
     const pick = mature[Math.floor(rnd() * mature.length)];
+    const hive = s.decorations.hive;
     const plots = s.plots.slice();
-    plots[pick.i] = { ...pick.p, boost: 1.5 };
-    return { state: { ...s, plots, nextEventAt: next }, msg: "🐝 蜜蜂來採蜜了！標記的花收獲 +50%" };
+    plots[pick.i] = { ...pick.p, boost: hive ? 1.75 : 1.5 };
+    return {
+      state: { ...s, plots, nextEventAt: next },
+      msg: hive ? "🍯 蜜蜂來採蜜了！標記的花收獲 +75%（蜜蜂巢）" : "🐝 蜜蜂來採蜜了！標記的花收獲 +50%",
+    };
   }
   if (r < 0.45) {
     if (s.decorations.scarecrow) return { state: { ...s, nextEventAt: next }, msg: null };
@@ -299,6 +328,27 @@ export const MILESTONES: Milestone[] = [
     reward: 40,
     check: (s) => Object.values(s.decorations).filter(Boolean).length >= 3,
     meta: (s) => `${Object.values(s.decorations).filter(Boolean).length}/3 種`,
+  },
+  {
+    id: "book-6",
+    desc: "圖鑑收錄 6 種植物",
+    reward: 50,
+    check: (s) => Object.values(s.harvestCounts).filter((n) => n > 0).length >= 6,
+    meta: (s) => `${Object.values(s.harvestCounts).filter((n) => n > 0).length}/6 種`,
+  },
+  {
+    id: "book-12",
+    desc: "集齊 12 種植物圖鑑",
+    reward: 150,
+    check: (s) => Object.values(s.harvestCounts).filter((n) => n > 0).length >= 12,
+    meta: (s) => `${Object.values(s.harvestCounts).filter((n) => n > 0).length}/12 種`,
+  },
+  {
+    id: "combo-10",
+    desc: "達成 10 連收",
+    reward: 60,
+    check: (s) => s.bestCombo >= 10,
+    meta: (s) => `${Math.min(s.bestCombo, 10)}/10 連`,
   },
 ];
 

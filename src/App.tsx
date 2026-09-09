@@ -19,6 +19,7 @@ import {
 import { DECOS } from "./game/decor";
 import {
   buyDeco,
+  buyFertilizer,
   buyMysterySeed,
   buyPremiumSeed,
   buySeed,
@@ -298,6 +299,18 @@ export default function App() {
     showToast(`🎰 高級盲盒：${PLANTS[res.plant].name}種子！點空地種下它`);
   }, [state, showToast]);
 
+  const onBuyFertilizer = useCallback(() => {
+    const res = buyFertilizer(state);
+    if (res.error) {
+      sfx.error();
+      showToast(res.error);
+      return;
+    }
+    setState(res.state!);
+    sfx.coin();
+    showToast(`買了 1 袋肥料🪴（持有 ${res.state!.fertilizer}），種花時自動生效`);
+  }, [state, showToast]);
+
   const onCheckIn = useCallback(() => {
     const res = checkIn(state);
     if (res.error) {
@@ -409,6 +422,7 @@ export default function App() {
           onSelect={onSelectSeed}
           onBuyMystery={onBuyMystery}
           onBuyPremium={onBuyPremium}
+          onBuyFertilizer={onBuyFertilizer}
           onBuyDeco={onBuyDeco}
           onUnlockRow={onUnlockRow}
           onPrestige={onPrestige}

@@ -60,9 +60,16 @@ export default function Plot({ plot, index, locked, lockCost, canPlant, floater,
       )}
       {mature && (
         <span className={`harvest-badge${golden || boosted ? " golden" : ""}`}>
-          {golden && boosted ? "✨🐝 ×3" : golden ? "✨ 金色 ×2" : boosted ? "🐝 +50%" : "收獲"}
+          {golden && boosted
+            ? `✨🐝 ×${2 * plot.boost}`
+            : golden
+              ? "✨ 金色 ×2"
+              : boosted
+                ? `🐝 +${Math.round((plot.boost - 1) * 100)}%`
+                : "收獲"}
         </span>
       )}
+      {plot.plant && !mature && plot.fertilized && <span className="fert-chip">🪴×2</span>}
       {plot.plant && (
         <span
           key={stage}

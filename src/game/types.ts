@@ -14,7 +14,7 @@ export type PlantId =
 
 export type WeatherKind = "sunny" | "hot" | "rain";
 
-export type DecoId = "fence" | "fountain" | "butterfly" | "birdhouse" | "sprinkler" | "scarecrow" | "clover";
+export type DecoId = "fence" | "fountain" | "butterfly" | "birdhouse" | "sprinkler" | "scarecrow" | "clover" | "hive";
 
 export interface PlantDef {
   id: PlantId;
@@ -39,6 +39,8 @@ export interface Plot {
   golden: boolean;
   /** one-time harvest multiplier (bee event), 1 = none */
   boost: number;
+  /** planted with fertilizer: grows twice as fast */
+  fertilized: boolean;
 }
 
 export interface GameState {
@@ -75,6 +77,10 @@ export interface GameState {
   coinBoostUntil: number;
   /** lifetime harvest count per plant (plant book; survives prestige) */
   harvestCounts: Record<PlantId, number>;
+  /** fertilizer in the shed; auto-applied when planting (grows 2x faster) */
+  fertilizer: number;
+  /** highest combo streak reached this run */
+  bestCombo: number;
   /** epoch ms of last save */
   savedAt: number;
 }

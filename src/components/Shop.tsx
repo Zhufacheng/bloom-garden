@@ -1,6 +1,6 @@
 import { todayStr, tomorrowStr } from "../game/daily";
 import { DECOS } from "../game/decor";
-import { MYSTERY_COST, PREMIUM_COST, prestigeDewGain } from "../game/logic";
+import { FERTILIZER_COST, FERTILIZER_MAX, MYSTERY_COST, PREMIUM_COST, prestigeDewGain } from "../game/logic";
 import { marketMult } from "../game/market";
 import { MAX_ROWS, PLANT_LIST, ROW_COSTS } from "../game/plants";
 import type { DecoId, GameState, PlantId } from "../game/types";
@@ -14,6 +14,7 @@ interface Props {
   onSelect: (p: PlantId) => void;
   onBuyMystery: () => void;
   onBuyPremium: () => void;
+  onBuyFertilizer: () => void;
   onBuyDeco: (d: DecoId) => void;
   onUnlockRow: () => void;
   onPrestige: () => void;
@@ -21,7 +22,7 @@ interface Props {
   onClose: () => void;
 }
 
-export default function Shop({ state, selected, onBuy, onSelect, onBuyMystery, onBuyPremium, onBuyDeco, onUnlockRow, onPrestige, onReset, onClose }: Props) {
+export default function Shop({ state, selected, onBuy, onSelect, onBuyMystery, onBuyPremium, onBuyFertilizer, onBuyDeco, onUnlockRow, onPrestige, onReset, onClose }: Props) {
   const today = todayStr();
   const tomorrow = tomorrowStr();
   const dewGain = prestigeDewGain(state);
@@ -56,6 +57,25 @@ export default function Shop({ state, selected, onBuy, onSelect, onBuyMystery, o
           </span>
           <button className="buy-btn" onClick={(e) => { e.stopPropagation(); onBuyPremium(); }}>
             <CoinIcon size={13} /> {PREMIUM_COST}
+          </button>
+        </div>
+        <div className="shop-item fertilizer" onClick={onBuyFertilizer}>
+          <span className="icon-emoji">🪴</span>
+          <span className="info">
+            <span className="name">肥料 <small>Fertilizer</small></span>
+            <span className="meta">
+              種植時自動用 1 袋：那株花長速 ×2（留給貴花最划算）· 持有 {state.fertilizer}/{FERTILIZER_MAX}
+            </span>
+          </span>
+          <button
+            className="buy-btn"
+            disabled={state.fertilizer >= FERTILIZER_MAX}
+            onClick={(e) => {
+              e.stopPropagation();
+              onBuyFertilizer();
+            }}
+          >
+            <CoinIcon size={13} /> {FERTILIZER_COST}
           </button>
         </div>
         {PLANT_LIST.map((def) => {

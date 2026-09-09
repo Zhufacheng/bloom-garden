@@ -51,8 +51,15 @@ export function loadGame(): GameState {
       dew: parsed.dew ?? 0,
       coinBoostUntil: parsed.coinBoostUntil ?? 0,
       harvestCounts: { ...emptyCounts(), ...(parsed.harvestCounts ?? {}) },
+      fertilizer: parsed.fertilizer ?? 0,
+      bestCombo: parsed.bestCombo ?? 0,
     };
-    merged.plots = merged.plots.map((p) => ({ ...p, golden: p.golden ?? false, boost: p.boost ?? 1 }));
+    merged.plots = merged.plots.map((p) => ({
+      ...p,
+      golden: p.golden ?? false,
+      boost: p.boost ?? 1,
+      fertilized: p.fertilized ?? false,
+    }));
     return tickWeather(stepState({ ...merged, savedAt: now }, dt), now);
   } catch {
     return newGame();

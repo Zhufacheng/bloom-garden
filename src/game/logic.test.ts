@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  FERTILIZER_COST,
   MYSTERY_COST,
   PREMIUM_COST,
   PREMIUM_IDS,
   buyDeco,
+  buyFertilizer,
   buyMysterySeed,
   buyPremiumSeed,
   buySeed,
@@ -25,7 +27,7 @@ import {
 import { emptyDecorations } from "./decor";
 import { marketMult } from "./market";
 import { COLUMNS, PLANT_LIST, PLANTS, emptyCounts, emptySeeds } from "./plants";
-import type { DecoId, GameState, Plot } from "./types";
+import type { DecoId, GameState, PlantId, Plot } from "./types";
 import { rollWeather, tickWeather } from "./weather";
 
 /** fixed date so market prices are deterministic in tests */
@@ -326,6 +328,75 @@ describe("harvest", () => {
     const r = harvest(newGame(), 0);
     expect(r.error).toBeDefined();
   });
+
+  it("tracks the best combo streak", () => {
+    let s = plantSeed(newGame(), 0, "grass")!.state!;
+    s = plantSeed(s, 1, "grass")!.state!;
+    s = matureAt(matureAt(s, 0), 1);
+    const t0 = 1_000_000;
+    s = harvest(s, 0, D, t0)!.state!;
+    s = harvest(s, 1, D, t0 + 1_000)!.state!;
+    expect(s.combo).toBe(2);
+    expect(s.bestCombo).toBe(2);
+    expect(newGame().bestCombo).toBe(0);
+  });
+});
+
+describe("fertilizer", () => {
+  it("buys for 40 coins up to the max of 5", () => {
+    let s = { ...newGame(), coins: 200 };
+    for (let i = 0; i < 5; i++) s = buyFertilizer(s)!.state!;
+    expect(s.fertilizer).toBe(5);
+    expect(s.coins).toBe(200 - 5 * FERTILIZER_COST);
+    expect(buyFertilizer(s).error).toBeDefined();
+  });
+
+  it("refuses when coins are short", () => {
+    expect(buyFertilizer({ ...newGame(), coins: FERTILIZER_COST - 1 }).error).toBeDefined();
+  });
+
+  it("auto-applies to the next plant, which grows 2x faster", () => {
+    const s = plantSeed({ ...newGame(), fertilizer: 1 }, 0, "grass")!.state!;
+    expect(s.fertilizer).toBe(0);
+    expect(s.plots[0].fertilized).toBe(true);
+    // grass grows in 20s normally; 10s with fertilizer
+    expect(stepState(s, 10).plots[0].progress).toBe(1);
+    const plain = stepState(plantSeed(newGame(), 3, "grass")!.state!, 10);
+    expect(plain.plots[3].progress).toBe(0.5);
+  });
+
+  it("does not apply when the shed is empty", () => {
+    const s = plantSeed(newGame(), 0, "grass")!.state!;
+    expect(s.plots[0].fertilized).toBe(false);
+    expect(s.fertilizer).toBe(0);
+  });
+});
+
+describe("plant book & combo milestones", () => {
+  const withBook = (ids: PlantId[]) => {
+    const counts = emptyCounts();
+    for (const id of ids) counts[id] = 1;
+    return counts;
+  };
+
+  it("book-6 rewards collecting 6 species", () => {
+    const s = { ...newGame(), harvestCounts: withBook(["grass", "daisy", "daffodil", "cactus", "tulip", "lavender"]) };
+    const r = claimMilestone(s, "book-6");
+    expect(r.error).toBeUndefined();
+    expect(r.earned).toBe(50);
+    expect(claimMilestone({ ...newGame(), harvestCounts: withBook(["grass"]) }, "book-6").error).toBeDefined();
+  });
+
+  it("book-12 rewards a complete collection", () => {
+    expect(claimMilestone({ ...newGame(), harvestCounts: withBook(["grass", "rose"]) }, "book-12").error).toBeDefined();
+    const r = claimMilestone({ ...newGame(), harvestCounts: withBook(PLANT_LIST.map((p) => p.id)) }, "book-12");
+    expect(r.earned).toBe(150);
+  });
+
+  it("combo-10 rewards a best streak of 10", () => {
+    expect(claimMilestone({ ...newGame(), bestCombo: 9 }, "combo-10").error).toBeDefined();
+    expect(claimMilestone({ ...newGame(), bestCombo: 10 }, "combo-10").earned).toBe(60);
+  });
 });
 
 describe("waterPlot", () => {
@@ -483,6 +554,19 @@ describe("tickEvents", () => {
     const r = tickEvents(s, Date.now(), seq(0.5, 0.5, 0.1, 0)); // delay, event, bee band, first mature
     expect(r.msg).toContain("蜜蜂");
     expect(r.state.plots[0].boost).toBe(1.5);
+  });
+
+  it("bee with a beehive boosts one mature plot by 1.75x", () => {
+    let s = due();
+    s = plantSeed(s, 0, "grass")!.state!;
+    s = {
+      ...s,
+      decorations: { ...emptyDecorations(), hive: true },
+      plots: s.plots.map((p, i) => (i === 0 ? { ...p, progress: 1 } : p)),
+    };
+    const r = tickEvents(s, Date.now(), seq(0.5, 0.5, 0.1, 0)); // delay, event, bee band, first mature
+    expect(r.msg).toContain("蜜蜂巢");
+    expect(r.state.plots[0].boost).toBe(1.75);
   });
 
   it("rainbow speeds up growth for 60s", () => {
