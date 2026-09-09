@@ -35,7 +35,8 @@ export default function Garden({ state, canPlant, floater, onPlotTap }: Props) {
   const zoomRef = useRef(1);
 
   const onPointerDown = (e: React.PointerEvent) => {
-    e.currentTarget.setPointerCapture?.(e.pointerId);
+    // NOTE: no setPointerCapture here — capturing on the wrapper would
+    // re-target pointerup/click away from the canvas and break R3F clicks
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointers.current.size === 1) {
       drag.current = { x: e.clientX, rot: worldRef.current?.rotation.y ?? 0 };
