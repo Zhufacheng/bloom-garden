@@ -16,6 +16,8 @@ export type WeatherKind = "sunny" | "hot" | "rain";
 
 export type DecoId = "fence" | "fountain" | "butterfly" | "birdhouse" | "sprinkler" | "scarecrow" | "clover" | "hive";
 
+export type PetId = "cat" | "rabbit" | "hedgehog";
+
 export interface PlantDef {
   id: PlantId;
   name: string;
@@ -67,6 +69,8 @@ export interface GameState {
   weatherUntil: number;
   /** owned garden decorations */
   decorations: Record<DecoId, boolean>;
+  /** owned garden companions (passive bonuses, reset on prestige) */
+  pets: Record<PetId, boolean>;
   /** ids of claimed milestones */
   milestones: string[];
   /** epoch ms of the next random event roll */

@@ -5,8 +5,9 @@ import { stageOf } from "../components/PlantSprite";
 import { isMature } from "../game/logic";
 import { COLUMNS, MAX_ROWS, PLANTS } from "../game/plants";
 import { DECOS } from "../game/decor";
+import { PETS } from "../game/pets";
 import type { GameState, Plot } from "../game/types";
-import EmojiSprite from "./EmojiSprite";
+import EmojiSprite, { emojiTexture } from "./EmojiSprite";
 import PlantMesh from "./PlantMesh";
 
 const PLOT_GAP = 1.2;
@@ -57,6 +58,25 @@ function Rain() {
       </bufferGeometry>
       <pointsMaterial size={0.05} color="#dceafc" transparent opacity={0.85} />
     </points>
+  );
+}
+
+/** a companion pet strolling back and forth along the front of the garden */
+function PetWander({ emoji, phase }: { emoji: string; phase: number }) {
+  const ref = useRef<THREE.Sprite>(null);
+  const map = useMemo(() => emojiTexture(emoji), [emoji]);
+  useFrame(({ clock }) => {
+    const sp = ref.current;
+    if (!sp) return;
+    const t = clock.elapsedTime;
+    sp.position.x = Math.sin(t * 0.25 + phase) * 4.6;
+    sp.position.z = 2.9;
+    sp.position.y = 0.42 + Math.sin(t * 2 + phase) * 0.05;
+  });
+  return (
+    <sprite ref={ref} position={[0, 0.42, 2.9]} scale={[0.5, 0.5, 1]}>
+      <spriteMaterial map={map} transparent depthWrite={false} />
+    </sprite>
   );
 }
 
@@ -165,6 +185,7 @@ function World({ state, canPlant, onPlotTap, worldRef }: WorldProps) {
   const amb = state.weather === "hot" ? 1.0 : state.weather === "rain" ? 0.6 : 0.85;
   const sun = state.weather === "hot" ? 1.5 : state.weather === "rain" ? 0.5 : 1.2;
   const ownedDecos = DECOS.filter((d) => state.decorations[d.id]);
+  const ownedPets = PETS.filter((p) => state.pets[p.id]);
   return (
     <>
       <color attach="background" args={[sky]} />
@@ -191,6 +212,9 @@ function World({ state, canPlant, onPlotTap, worldRef }: WorldProps) {
         ))}
         {ownedDecos.map((d, i) => (
           <EmojiSprite key={d.id} emoji={d.emoji} position={[i * 0.75 - ((ownedDecos.length - 1) * 0.75) / 2, 0.7, -3.2]} scale={0.6} bob />
+        ))}
+        {ownedPets.map((p, i) => (
+          <PetWander key={p.id} emoji={p.emoji} phase={i * 2.1} />
         ))}
       </group>
     </>

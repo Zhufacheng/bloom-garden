@@ -41,6 +41,7 @@ export function loadGame(): GameState {
       weather: parsed.weather ?? "sunny",
       weatherUntil: parsed.weatherUntil ?? now + 180_000,
       decorations: { ...fresh.decorations, ...(parsed.decorations ?? {}) },
+      pets: { ...fresh.pets, ...(parsed.pets ?? {}) },
       milestones: parsed.milestones ?? [],
       nextEventAt: parsed.nextEventAt ?? now + 90_000,
       growthBoostUntil: parsed.growthBoostUntil ?? 0,

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   FERTILIZER_COST,
+  MILESTONES,
   MYSTERY_COST,
   PREMIUM_COST,
   PREMIUM_IDS,
@@ -8,6 +9,7 @@ import {
   buyDeco,
   buyFertilizer,
   buyMysterySeed,
+  buyPet,
   buyUpgrade,
   buyPremiumSeed,
   buySeed,
@@ -30,6 +32,8 @@ import {
 import { emptyDecorations } from "./decor";
 import { marketMult } from "./market";
 import { COLUMNS, PLANT_LIST, PLANTS, emptyCounts, emptySeeds } from "./plants";
+import { emptyPets } from "./pets";
+import { SEASONS, seasonMult, seasonOf } from "./seasons";
 import type { DecoId, GameState, PlantId, Plot } from "./types";
 import { rollWeather, tickWeather } from "./weather";
 
@@ -101,12 +105,13 @@ const matureAt = (s: GameState, i: number, patch: Partial<Plot> = {}): GameState
 describe("golden plants", () => {
   it("sell for double", () => {
     const s = matureAt(plantSeed({ ...newGame(), ...sunny }, 0, "grass")!.state!, 0, { golden: true });
-    expect(harvest(s, 0, D).earned).toBe(Math.round(Math.round(12 * marketMult("grass", D)) * 2)); // grass 12 x2
+    // grass 12 x2 (season factor applies; grass is out of season on D)
+    expect(harvest(s, 0, D).earned).toBe(Math.round(12 * marketMult("grass", D) * seasonMult("grass", D) * 2));
   });
 
   it("non-golden sells normally", () => {
     const s = matureAt(plantSeed({ ...newGame(), ...sunny }, 0, "grass")!.state!, 0);
-    expect(harvest(s, 0, D).earned).toBe(Math.round(12 * marketMult("grass", D)));
+    expect(harvest(s, 0, D).earned).toBe(Math.round(12 * marketMult("grass", D) * seasonMult("grass", D)));
   });
 });
 
@@ -302,7 +307,7 @@ describe("stepState growth and water", () => {
 describe("harvest", () => {
   it("harvests a mature plant for coins and clears the plot", () => {
     const s = matureAt(plantSeed(newGame(), 0, "grass")!.state!, 0); // no golden roll
-    const expected = Math.round(12 * marketMult("grass", D));
+    const expected = Math.round(12 * marketMult("grass", D) * seasonMult("grass", D));
     const r = harvest(s, 0, D);
     expect(r.earned).toBe(expected);
     expect(r.state!.coins).toBe(30 + expected); // starter grass seed costs nothing
@@ -459,7 +464,7 @@ describe("daily market", () => {
   it("sellValueOf reflects the market", () => {
     const s = newGame();
     const m = marketMult("grass", D);
-    expect(sellValueOf(s, "grass", false, D)).toBe(Math.round(12 * m));
+    expect(sellValueOf(s, "grass", false, D)).toBe(Math.round(12 * m * seasonMult("grass", D)));
   });
 });
 
@@ -490,7 +495,7 @@ describe("stepState speed (rainbow)", () => {
 describe("harvest boost (bee)", () => {
   it("boosted plot earns 1.5x", () => {
     const s = matureAt(plantSeed({ ...newGame(), ...sunny }, 0, "grass")!.state!, 0, { boost: 1.5 });
-    const expected = Math.round(Math.round(12 * marketMult("grass", D)) * 1.5);
+    const expected = Math.round(Math.round(12 * marketMult("grass", D) * seasonMult("grass", D)) * 1.5);
     expect(harvest(s, 0, D).earned).toBe(expected);
   });
 });
@@ -623,7 +628,7 @@ describe("harvest combo", () => {
     s = matureAt(s, 2);
     return s;
   };
-  const base = Math.round(12 * marketMult("grass", D));
+  const base = Math.round(12 * marketMult("grass", D) * seasonMult("grass", D));
 
   it("3rd consecutive harvest within the window earns a bonus", () => {
     let s = threeMature();
@@ -783,6 +788,7 @@ describe("prestige (dew)", () => {
       lastCheckIn: "2026-09-09",
       checkInStreak: 3,
       harvestCounts: { ...emptyCounts(), rose: 5 },
+      pets: { ...emptyPets(), cat: true },
     };
     const r = prestige(s);
     expect(r.dewGained).toBe(2);
@@ -793,6 +799,7 @@ describe("prestige (dew)", () => {
     expect(st.lastCheckIn).toBe("2026-09-09");
     expect(st.checkInStreak).toBe(3);
     expect(st.decorations.fountain).toBe(false);
+    expect(st.pets.cat).toBe(false);
     expect(st.harvestCounts.rose).toBe(5);
   });
 });
@@ -801,7 +808,7 @@ describe("golden hour harvest", () => {
   it("doubles harvest coins while active, not after", () => {
     const s0 = matureAt(plantSeed({ ...newGame(), ...sunny }, 0, "grass")!.state!, 0);
     const t0 = 1_000_000;
-    const base = Math.round(12 * marketMult("grass", D));
+    const base = Math.round(12 * marketMult("grass", D) * seasonMult("grass", D));
     const boosted = harvest({ ...s0, coinBoostUntil: t0 + 60_000 }, 0, D, t0);
     expect(boosted.earned).toBe(base * 2);
     const plain = harvest(s0, 0, D, t0);
@@ -863,5 +870,96 @@ describe("dew sell bonus", () => {
     const s = { ...newGame(), dew: 10 };
     const m = marketMult("daisy", D);
     expect(sellValueOf(s, "daisy", false, D)).toBe(Math.round(30 * m * 1.5)); // 1 + 10 x 0.05
+  });
+});
+
+describe("seasons", () => {
+  it("is deterministic and rotates every 3 days", () => {
+    expect(seasonOf(D).id).toBe(seasonOf(D).id);
+    expect(seasonOf("2026-09-08").id).toBe(seasonOf("2026-09-09").id); // same 3-day block
+    expect(seasonOf("2026-09-10").id).not.toBe(seasonOf("2026-09-09").id);
+  });
+
+  it("covers all 12 plants exactly once across the four seasons", () => {
+    const all = SEASONS.flatMap((s) => s.bonus);
+    expect(all).toHaveLength(12);
+    expect(new Set(all).size).toBe(12);
+  });
+
+  it("in-season plants sell for +20% on D (summer)", () => {
+    expect(seasonOf(D).id).toBe("summer");
+    expect(seasonMult("sunflower", D)).toBeCloseTo(1.2, 5);
+    const s = newGame();
+    expect(sellValueOf(s, "sunflower", false, D)).toBe(Math.round(125 * marketMult("sunflower", D) * 1.2));
+    // grass is out of season on D
+    expect(sellValueOf(s, "grass", false, D)).toBe(Math.round(12 * marketMult("grass", D)));
+  });
+});
+
+describe("pets", () => {
+  function seq(...vals: number[]) {
+    let i = 0;
+    return () => vals[i++ % vals.length];
+  }
+
+  it("buys for coins, once each", () => {
+    let s = { ...newGame(), coins: 500 };
+    const r = buyPet(s, "cat");
+    expect(r.state!.pets.cat).toBe(true);
+    expect(r.state!.coins).toBe(500 - 350);
+    expect(buyPet(r.state!, "cat").error).toBeDefined();
+    expect(buyPet({ ...newGame(), coins: 100 }, "rabbit").error).toBeDefined();
+  });
+
+  it("cat adds 5% to the sell value", () => {
+    const s = { ...newGame(), pets: { ...emptyPets(), cat: true } };
+    const m = marketMult("daisy", D);
+    expect(sellValueOf(s, "daisy", false, D)).toBe(Math.round(30 * m * 1.05));
+  });
+
+  it("rabbit speeds growth by 5%", () => {
+    const s = plantSeed({ ...newGame(), ...sunny, pets: { ...emptyPets(), rabbit: true } }, 0, "grass")!.state!;
+    expect(stepState(s, 10).plots[0].progress).toBeCloseTo(0.525, 5); // (10/20) x 1.05
+  });
+
+  it("hedgehog blocks the caterpillar 25% of the time", () => {
+    const base = () => {
+      let s = { ...newGame(), nextEventAt: Date.now() - 1, pets: { ...emptyPets(), hedgehog: true } };
+      s = plantSeed(s, 0, "grass")!.state!;
+      s = { ...s, plots: s.plots.map((p, i) => (i === 0 ? { ...p, progress: 0.5 } : p)) };
+      return s;
+    };
+    const blocked = tickEvents(base(), Date.now(), seq(0.5, 0.5, 0.4, 0.1)); // 0.1 < 0.25 blocks
+    expect(blocked.msg).toContain("刺猬");
+    expect(blocked.state.plots[0].progress).toBe(0.5); // untouched
+    const eaten = tickEvents(base(), Date.now(), seq(0.5, 0.5, 0.4, 0.9, 0)); // 0.9 fails, first plot
+    expect(eaten.msg).toContain("毛毛蟲");
+    expect(eaten.state.plots[0].progress).toBeCloseTo(0.25, 5);
+  });
+});
+
+describe("extended milestones", () => {
+  it("the catalog now has 15 milestones", () => {
+    expect(MILESTONES).toHaveLength(15);
+  });
+
+  it("harvest-400 / earn-15000 / combo-20 pay when met", () => {
+    expect(claimMilestone({ ...newGame(), totalHarvested: 400 }, "harvest-400").earned).toBe(80);
+    expect(claimMilestone({ ...newGame(), totalHarvested: 399 }, "harvest-400").error).toBeDefined();
+    expect(claimMilestone({ ...newGame(), totalEarned: 15000 }, "earn-15000").earned).toBe(150);
+    expect(claimMilestone({ ...newGame(), bestCombo: 20 }, "combo-20").earned).toBe(100);
+    expect(claimMilestone({ ...newGame(), bestCombo: 19 }, "combo-20").error).toBeDefined();
+  });
+
+  it("deco-8 pays for a full decoration set", () => {
+    const deco = { ...emptyDecorations() };
+    (Object.keys(deco) as DecoId[]).forEach((k) => (deco[k] = true));
+    expect(claimMilestone({ ...newGame(), decorations: deco }, "deco-8").earned).toBe(120);
+  });
+
+  it("pets-3 pays for all three companions", () => {
+    const s = { ...newGame(), pets: { ...emptyPets(), cat: true, rabbit: true, hedgehog: true } };
+    expect(claimMilestone(s, "pets-3").earned).toBe(100);
+    expect(claimMilestone({ ...newGame(), pets: { ...emptyPets(), cat: true } }, "pets-3").error).toBeDefined();
   });
 });

@@ -1,9 +1,11 @@
 import { DECOS, emptyDecorations } from "./decor";
 import { todayStr, yesterdayStr } from "./daily";
 import { marketMult } from "./market";
+import { PETS, emptyPets } from "./pets";
 import { COLUMNS, MAX_ROWS, PLANTS, PLANT_LIST, ROW_COSTS, START_ROWS, emptyCounts, emptySeeds } from "./plants";
+import { seasonMult } from "./seasons";
 import { DRAIN_RATES, REFILL_RATES, rollWeather } from "./weather";
-import type { DecoId, GameState, PlantId, Plot, Upgrades } from "./types";
+import type { DecoId, GameState, PetId, PlantId, Plot, Upgrades } from "./types";
 
 /** one full watering lasts 40 seconds in sunny weather */
 export const WATER_DRAIN_PER_SEC = 1 / 40;
@@ -66,6 +68,7 @@ export function newGame(): GameState {
     totalEarned: 0,
     ...rollWeather(Date.now()),
     decorations: emptyDecorations(),
+    pets: emptyPets(),
     milestones: [],
     nextEventAt: Date.now() + 90_000,
     growthBoostUntil: 0,
@@ -106,7 +109,7 @@ export function isUnlocked(s: GameState, index: number): boolean {
 export function stepState(s: GameState, dt: number, speed = 1): GameState {
   if (dt <= 0) return s;
   const fountain = s.decorations.fountain;
-  const effSpeed = speed * (s.upgrades.soil ? 1.1 : 1);
+  const effSpeed = speed * (s.upgrades.soil ? 1.1 : 1) * (s.pets.rabbit ? 1.05 : 1);
   const rate = DRAIN_RATES[s.weather] * (fountain ? 0.75 : 1);
   const refill = REFILL_RATES[s.weather] + (s.decorations.sprinkler ? SPRINKLER_RATE : 0);
   const goldenChance = goldenChanceOf(s);
@@ -203,7 +206,7 @@ export function buyFertilizer(s: GameState): { state?: GameState; error?: string
   return { state: { ...s, coins: s.coins - FERTILIZER_COST, fertilizer: s.fertilizer + 1 } };
 }
 
-/** Sell price today: base x daily market x dew x butterfly x golden-touch, doubled if golden. */
+/** Sell price today: base x daily market x dew x butterfly x golden-touch x season, doubled if golden. */
 export function sellValueOf(s: GameState, plant: PlantId, golden: boolean, date = todayStr()): number {
   const dewMult = 1 + s.dew * DEW_SELL_BONUS;
   const base =
@@ -211,7 +214,9 @@ export function sellValueOf(s: GameState, plant: PlantId, golden: boolean, date 
     marketMult(plant, date) *
     dewMult *
     (s.decorations.butterfly ? 1.1 : 1) *
-    (s.upgrades.touch ? 1.1 : 1);
+    (s.upgrades.touch ? 1.1 : 1) *
+    (s.pets.cat ? 1.05 : 1) *
+    seasonMult(plant, date);
   return Math.round(base * (golden ? 2 : 1));
 }
 
@@ -286,6 +291,8 @@ export function tickEvents(
   }
   if (r < 0.45) {
     if (s.decorations.scarecrow) return { state: { ...s, nextEventAt: next }, msg: null };
+    if (s.pets.hedgehog && rnd() < 0.25)
+      return { state: { ...s, nextEventAt: next }, msg: "🦔 刺猬把毛毛蟲趕跑了！" };
     const growing = s.plots.map((p, i) => ({ p, i })).filter(({ p }) => p.plant && p.progress < 1);
     if (growing.length === 0) return { state: { ...s, nextEventAt: next }, msg: null };
     const pick = growing[Math.floor(rnd() * growing.length)];
@@ -344,6 +351,14 @@ export function buyDeco(s: GameState, deco: DecoId): { state?: GameState; error?
   return { state: { ...s, coins: s.coins - def.cost, decorations: { ...s.decorations, [deco]: true } } };
 }
 
+/** Buy a garden companion (passive bonus, reset on prestige). */
+export function buyPet(s: GameState, pet: PetId): { state?: GameState; error?: string } {
+  if (s.pets[pet]) return { error: "已經迎來了" };
+  const def = PETS.find((p) => p.id === pet)!;
+  if (s.coins < def.cost) return { error: `金幣不夠，${def.name}要 ${def.cost}` };
+  return { state: { ...s, coins: s.coins - def.cost, pets: { ...s.pets, [pet]: true } } };
+}
+
 export interface Milestone {
   id: string;
   desc: string;
@@ -386,6 +401,41 @@ export const MILESTONES: Milestone[] = [
     reward: 60,
     check: (s) => s.bestCombo >= 10,
     meta: (s) => `${Math.min(s.bestCombo, 10)}/10 連`,
+  },
+  {
+    id: "harvest-400",
+    desc: "累計收獲 400 株",
+    reward: 80,
+    check: (s) => s.totalHarvested >= 400,
+    meta: (s) => `${Math.min(s.totalHarvested, 400)}/400 株`,
+  },
+  {
+    id: "earn-15000",
+    desc: "累計賺取 15000 金幣",
+    reward: 150,
+    check: (s) => s.totalEarned >= 15000,
+    meta: (s) => `${Math.min(s.totalEarned, 15000)}/15000`,
+  },
+  {
+    id: "combo-20",
+    desc: "達成 20 連收",
+    reward: 100,
+    check: (s) => s.bestCombo >= 20,
+    meta: (s) => `${Math.min(s.bestCombo, 20)}/20 連`,
+  },
+  {
+    id: "deco-8",
+    desc: "集齊 8 種裝飾",
+    reward: 120,
+    check: (s) => Object.values(s.decorations).filter(Boolean).length >= 8,
+    meta: (s) => `${Object.values(s.decorations).filter(Boolean).length}/8 種`,
+  },
+  {
+    id: "pets-3",
+    desc: "迎來 3 位花園夥伴",
+    reward: 100,
+    check: (s) => Object.values(s.pets).filter(Boolean).length >= 3,
+    meta: (s) => `${Object.values(s.pets).filter(Boolean).length}/3 位`,
   },
 ];
 

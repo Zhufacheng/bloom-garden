@@ -10,7 +10,9 @@ import {
 } from "../game/logic";
 import { marketMult } from "../game/market";
 import { MAX_ROWS, PLANT_LIST, ROW_COSTS } from "../game/plants";
-import type { DecoId, GameState, PlantId, Upgrades } from "../game/types";
+import { PETS } from "../game/pets";
+import { isSeasonPlant, seasonMult } from "../game/seasons";
+import type { DecoId, GameState, PetId, PlantId, Upgrades } from "../game/types";
 import { CoinIcon } from "./Icons";
 import PlantSprite from "./PlantSprite";
 
@@ -23,6 +25,7 @@ interface Props {
   onBuyPremium: () => void;
   onBuyFertilizer: () => void;
   onBuyDeco: (d: DecoId) => void;
+  onBuyPet: (p: PetId) => void;
   onUnlockRow: () => void;
   onPrestige: () => void;
   onBuyUpgrade: (id: keyof Upgrades) => void;
@@ -30,7 +33,7 @@ interface Props {
   onClose: () => void;
 }
 
-export default function Shop({ state, selected, onBuy, onSelect, onBuyMystery, onBuyPremium, onBuyFertilizer, onBuyDeco, onUnlockRow, onPrestige, onBuyUpgrade, onReset, onClose }: Props) {
+export default function Shop({ state, selected, onBuy, onSelect, onBuyMystery, onBuyPremium, onBuyFertilizer, onBuyDeco, onBuyPet, onUnlockRow, onPrestige, onBuyUpgrade, onReset, onClose }: Props) {
   const today = todayStr();
   const tomorrow = tomorrowStr();
   const dewGain = prestigeDewGain(state);
@@ -88,8 +91,9 @@ export default function Shop({ state, selected, onBuy, onSelect, onBuyMystery, o
         </div>
         {PLANT_LIST.map((def) => {
           const stock = state.seeds[def.id] ?? 0;
-          const mult = marketMult(def.id, today);
+          const mult = marketMult(def.id, today) * seasonMult(def.id, today);
           const price = Math.round(def.sellValue * mult);
+          const inSeason = isSeasonPlant(def.id, today);
           const arrow = mult > 1.05 ? <span className="mkt up">▲</span> : mult < 0.95 ? <span className="mkt down">▼</span> : null;
           const tMult = marketMult(def.id, tomorrow);
           const trend =
@@ -112,6 +116,7 @@ export default function Shop({ state, selected, onBuy, onSelect, onBuyMystery, o
               <span className="info">
                 <span className="name">
                   {def.name} <small>{def.nameEn}</small>
+                  {inSeason && <span className="season-badge">當季 +20%</span>}
                 </span>
                 <span className="meta">
                   成熟 {def.growTime} 秒 · 今天賣 <b className={`price${mult > 1.05 ? " up" : mult < 0.95 ? " down" : ""}`}>{price}</b> {arrow} · 明天{trend}
@@ -153,6 +158,33 @@ export default function Shop({ state, selected, onBuy, onSelect, onBuyMystery, o
                 <span className="price">
                   <CoinIcon size={14} />
                   {d.cost}
+                </span>
+              )}
+            </div>
+          );
+        })}
+
+        <div className="section-title">🐾 花園夥伴（被動加成；轉生會重置）</div>
+        {PETS.map((p) => {
+          const owned = state.pets[p.id];
+          return (
+            <div
+              key={p.id}
+              className={`shop-item${owned ? " selected" : ""}`}
+              onClick={owned ? undefined : () => onBuyPet(p.id)}
+            >
+              <span className="icon-emoji">{p.emoji}</span>
+              <span className="info">
+                <span className="name">
+                  {p.name}
+                  {owned && <small> ✓ 已迎來</small>}
+                </span>
+                <span className="meta">{p.effect} · 會在花園前端巡遊</span>
+              </span>
+              {!owned && (
+                <span className="price">
+                  <CoinIcon size={14} />
+                  {p.cost}
                 </span>
               )}
             </div>

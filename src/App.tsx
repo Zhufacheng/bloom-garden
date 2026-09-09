@@ -22,6 +22,7 @@ import {
   buyDeco,
   buyFertilizer,
   buyMysterySeed,
+  buyPet,
   buyPremiumSeed,
   buySeed,
   buyUpgrade,
@@ -38,8 +39,9 @@ import {
   waterPlot,
 } from "./game/logic";
 import { PLANTS } from "./game/plants";
+import { PETS } from "./game/pets";
 import { loadDaily, loadGame, resetGame, saveDaily, saveGame } from "./game/save";
-import type { DecoId, GameState, PlantId, Upgrades } from "./game/types";
+import type { DecoId, GameState, PetId, PlantId, Upgrades } from "./game/types";
 import { tickWeather } from "./game/weather";
 import { isMuted, setMuted, sfx } from "./sfx";
 
@@ -375,6 +377,22 @@ export default function App() {
     [state, showToast]
   );
 
+  const onBuyPet = useCallback(
+    (pet: PetId) => {
+      const res = buyPet(state, pet);
+      if (res.error) {
+        sfx.error();
+        showToast(res.error);
+        return;
+      }
+      setState(res.state!);
+      sfx.unlock();
+      const def = PETS.find((p) => p.id === pet)!;
+      showToast(`迎來 ${def.name} ${def.emoji}！效果立即生效`);
+    },
+    [state, showToast]
+  );
+
   const toggleSound = useCallback(() => {
     const next = !soundOn;
     setSoundOn(next);
@@ -444,6 +462,7 @@ export default function App() {
           onBuyPremium={onBuyPremium}
           onBuyFertilizer={onBuyFertilizer}
           onBuyDeco={onBuyDeco}
+          onBuyPet={onBuyPet}
           onUnlockRow={onUnlockRow}
           onPrestige={onPrestige}
           onBuyUpgrade={onBuyUpgrade}

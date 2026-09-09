@@ -5,7 +5,7 @@ import * as THREE from "three";
 const cache = new Map<string, THREE.CanvasTexture>();
 
 /** draw an emoji to a canvas and reuse it as a sprite texture */
-function emojiTexture(emoji: string): THREE.CanvasTexture {
+export function emojiTexture(emoji: string): THREE.CanvasTexture {
   let t = cache.get(emoji);
   if (!t) {
     const size = 128;

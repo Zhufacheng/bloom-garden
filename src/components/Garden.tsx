@@ -1,6 +1,8 @@
 import { useRef } from "react";
 import * as THREE from "three";
-import { COLUMNS, ROW_COSTS } from "../game/plants";
+import { todayStr } from "../game/daily";
+import { COLUMNS, PLANTS, ROW_COSTS } from "../game/plants";
+import { seasonOf } from "../game/seasons";
 import { WEATHER_META } from "../game/weather";
 import type { GameState } from "../game/types";
 import GardenScene from "../three/GardenScene";
@@ -21,6 +23,7 @@ interface Props {
 
 export default function Garden({ state, canPlant, floater, onPlotTap }: Props) {
   const wx = WEATHER_META[state.weather];
+  const season = seasonOf(todayStr());
   const worldRef = useRef<THREE.Group>(null);
   const drag = useRef<{ x: number; rot: number } | null>(null);
 
@@ -45,6 +48,12 @@ export default function Garden({ state, canPlant, floater, onPlotTap }: Props) {
         <span className="head-chips">
           {Date.now() < state.coinBoostUntil && <span className="weather-chip gold-chip">💰 金幣加倍中</span>}
           {Date.now() < state.growthBoostUntil && <span className="weather-chip rainbow-chip">🌈 生長加速中</span>}
+          <span
+            className="weather-chip season-chip"
+            title={`當季植物：${season.bonus.map((b) => PLANTS[b].name).join("、")}（賣價 +20%）`}
+          >
+            {season.emoji} {season.name}季 · 當季 +20%
+          </span>
           <span className="weather-chip" title={wx.hint}>
             {wx.icon} {wx.label} · {wx.hint}
           </span>
