@@ -1,4 +1,16 @@
-export type PlantId = "grass" | "daisy" | "daffodil" | "tulip" | "cactus" | "sunflower" | "lavender" | "hyacinth" | "rose";
+export type PlantId =
+  | "grass"
+  | "daisy"
+  | "daffodil"
+  | "tulip"
+  | "cactus"
+  | "sunflower"
+  | "lavender"
+  | "hyacinth"
+  | "rose"
+  | "lotus"
+  | "cherry"
+  | "rainbowflower";
 
 export type WeatherKind = "sunny" | "hot" | "rain";
 
@@ -49,6 +61,10 @@ export interface GameState {
   nextEventAt: number;
   /** epoch ms until which all growth is sped up (rainbow event) */
   growthBoostUntil: number;
+  /** consecutive harvest streak (resets when the window expires) */
+  combo: number;
+  /** epoch ms until which the combo streak stays alive */
+  comboUntil: number;
   /** epoch ms of last save */
   savedAt: number;
 }

@@ -17,7 +17,7 @@ import {
 } from "./logic";
 import { emptyDecorations } from "./decor";
 import { marketMult } from "./market";
-import { COLUMNS, emptySeeds } from "./plants";
+import { COLUMNS, PLANT_LIST, PLANTS, emptySeeds } from "./plants";
 import type { DecoId, GameState, Plot } from "./types";
 import { rollWeather, tickWeather } from "./weather";
 
@@ -425,9 +425,25 @@ describe("tickEvents", () => {
     let s = due();
     s = plantSeed(s, 0, "grass")!.state!;
     s = { ...s, plots: s.plots.map((p, i) => (i === 0 ? { ...p, water: 0.2, progress: 0.5 } : p)) };
-    const r = tickEvents(s, Date.now(), seq(0.5, 0.5, 0.5)); // delay, event, shower band
+    const r = tickEvents(s, Date.now(), seq(0.5, 0.5, 0.6)); // delay, event, shower band
     expect(r.msg).toContain("快閃雨");
     expect(r.state.plots[0].water).toBe(1);
+    expect(r.state.nextEventAt).toBeGreaterThan(Date.now());
+  });
+
+  it("caterpillar eats 25% of a growing plant's progress", () => {
+    let s = due();
+    s = plantSeed(s, 0, "grass")!.state!;
+    s = { ...s, plots: s.plots.map((p, i) => (i === 0 ? { ...p, progress: 0.5 } : p)) };
+    const r = tickEvents(s, Date.now(), seq(0.5, 0.5, 0.4, 0)); // delay, event, caterpillar band, first plot
+    expect(r.msg).toContain("毛毛蟲");
+    expect(r.state.plots[0].progress).toBeCloseTo(0.25, 5);
+  });
+
+  it("caterpillar with nothing growing falls back to a calm roll", () => {
+    const s = due();
+    const r = tickEvents(s, Date.now(), seq(0.5, 0.5, 0.4));
+    expect(r.msg).toBeNull();
     expect(r.state.nextEventAt).toBeGreaterThan(Date.now());
   });
 
@@ -460,5 +476,66 @@ describe("tickEvents", () => {
     const r = tickEvents(s, Date.now(), seq(0.5, 0.5, 0.1)); // delay, event, bee band (none mature)
     expect(r.msg).toBeNull();
     expect(r.state.nextEventAt).toBeGreaterThan(Date.now());
+  });
+});
+
+describe("harvest combo", () => {
+  const threeMature = () => {
+    let s = newGame();
+    s = plantSeed(s, 0, "grass")!.state!;
+    s = matureAt(s, 0);
+    s = plantSeed(s, 1, "grass")!.state!;
+    s = matureAt(s, 1);
+    s = plantSeed(s, 2, "grass")!.state!;
+    s = matureAt(s, 2);
+    return s;
+  };
+  const base = Math.round(12 * marketMult("grass", D));
+
+  it("3rd consecutive harvest within the window earns a bonus", () => {
+    let s = threeMature();
+    const t0 = 1_000_000;
+    let r = harvest(s, 0, D, t0);
+    expect(r.combo).toBe(1);
+    expect(r.bonus).toBe(0);
+    s = r.state!;
+    r = harvest(s, 1, D, t0 + 5_000);
+    expect(r.combo).toBe(2);
+    expect(r.bonus).toBe(0);
+    s = r.state!;
+    r = harvest(s, 2, D, t0 + 10_000);
+    expect(r.combo).toBe(3);
+    const bonus = Math.round(base * 0.25);
+    expect(r.bonus).toBe(bonus);
+    expect(r.earned).toBe(base + bonus);
+  });
+
+  it("combo resets when the window expires", () => {
+    let s = threeMature();
+    const t0 = 1_000_000;
+    let r = harvest(s, 0, D, t0);
+    s = r.state!;
+    r = harvest(s, 1, D, t0 + 20_000);
+    expect(r.combo).toBe(1);
+    expect(r.bonus).toBe(0);
+  });
+});
+
+describe("plant catalog", () => {
+  it("has 12 plants including the new blooms", () => {
+    expect(PLANT_LIST).toHaveLength(12);
+    expect(PLANTS.lotus.sellValue).toBe(280);
+    expect(PLANTS.cherry.seedCost).toBe(130);
+    expect(PLANTS.rainbowflower.growTime).toBe(170);
+  });
+
+  it("new plants are buyable from the shop", () => {
+    let s = { ...newGame(), coins: 500 };
+    s = buySeed(s, "lotus")!.state!;
+    s = buySeed(s, "cherry")!.state!;
+    s = buySeed(s, "rainbowflower")!.state!;
+    expect(s.seeds.lotus).toBe(1);
+    expect(s.seeds.cherry).toBe(1);
+    expect(s.seeds.rainbowflower).toBe(1);
   });
 });

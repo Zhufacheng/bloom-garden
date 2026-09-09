@@ -20,6 +20,9 @@ export const PLANTS: Record<PlantId, PlantDef> = {
   sunflower: { id: "sunflower", name: "向日葵", nameEn: "Sunflower", seedCost: 45, growTime: 75, sellValue: 125 },
   hyacinth: { id: "hyacinth", name: "風信子", nameEn: "Hyacinth", seedCost: 55, growTime: 85, sellValue: 165 },
   rose: { id: "rose", name: "玫瑰", nameEn: "Rose", seedCost: 80, growTime: 110, sellValue: 220 },
+  lotus: { id: "lotus", name: "荷花", nameEn: "Lotus", seedCost: 100, growTime: 130, sellValue: 280 },
+  cherry: { id: "cherry", name: "櫻花", nameEn: "Cherry Blossom", seedCost: 130, growTime: 150, sellValue: 340 },
+  rainbowflower: { id: "rainbowflower", name: "彩虹花", nameEn: "Rainbow Flower", seedCost: 160, growTime: 170, sellValue: 420 },
 };
 
 export const PLANT_LIST: PlantDef[] = [
@@ -32,6 +35,9 @@ export const PLANT_LIST: PlantDef[] = [
   PLANTS.sunflower,
   PLANTS.hyacinth,
   PLANTS.rose,
+  PLANTS.lotus,
+  PLANTS.cherry,
+  PLANTS.rainbowflower,
 ];
 
 export function emptySeeds(): Record<PlantId, number> {
@@ -45,5 +51,8 @@ export function emptySeeds(): Record<PlantId, number> {
     sunflower: 0,
     hyacinth: 0,
     rose: 0,
+    lotus: 0,
+    cherry: 0,
+    rainbowflower: 0,
   };
 }

@@ -111,8 +111,13 @@ export default function App() {
         setState(res.state!);
         setDaily((d) => advanceDaily(advanceDaily(d, { type: "harvest", plants: 1 }), { type: "earn", coins: res.earned! }));
         sfx.harvest();
-        if (res.golden) sfx.coin();
-        if (res.golden) showToast("✨ 金色收獲！賣價加倍");
+        if (res.bonus) {
+          sfx.coin();
+          showToast(`🔥 連收 ×${res.combo}！額外 +${res.bonus} 金幣`);
+        } else if (res.golden) {
+          sfx.coin();
+          showToast("✨ 金色收獲！賣價加倍");
+        }
         setFloater({ index: i, amount: res.earned!, key: Date.now(), golden: res.golden });
         return;
       }
@@ -296,6 +301,7 @@ export default function App() {
         coins={state.coins}
         harvested={state.totalHarvested}
         unclaimed={unclaimedCount(daily)}
+        combo={Date.now() < state.comboUntil ? state.combo : 0}
         soundOn={soundOn}
         onTasks={() => {
           sfx.select();

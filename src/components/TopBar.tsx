@@ -4,12 +4,13 @@ interface Props {
   coins: number;
   harvested: number;
   unclaimed: number;
+  combo: number;
   soundOn: boolean;
   onTasks: () => void;
   onToggleSound: () => void;
 }
 
-export default function TopBar({ coins, harvested, unclaimed, soundOn, onTasks, onToggleSound }: Props) {
+export default function TopBar({ coins, harvested, unclaimed, combo, soundOn, onTasks, onToggleSound }: Props) {
   return (
     <header className="topbar">
       <div className="title">
@@ -17,6 +18,11 @@ export default function TopBar({ coins, harvested, unclaimed, soundOn, onTasks, 
         <small>BLOOM GARDEN · 養成小遊戲</small>
       </div>
       <div className="top-actions">
+        {combo >= 2 && (
+          <span className="combo-badge" title="15 秒內繼續收獲，每 3 連擊有額外金幣">
+            🔥 連收 ×{combo}
+          </span>
+        )}
         <button className="icon-btn" onClick={onTasks} aria-label="每日任務">
           🎯
           {unclaimed > 0 && <span className="badge">{unclaimed}</span>}

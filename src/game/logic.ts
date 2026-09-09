@@ -14,6 +14,9 @@ export const GOLDEN_CHANCE = 0.1;
 /** price of one mystery (random) seed */
 export const MYSTERY_COST = 25;
 
+/** a new harvest within this window keeps the combo streak alive */
+export const COMBO_WINDOW_MS = 15_000;
+
 export function createPlot(id: number): Plot {
   return { id, plant: null, progress: 0, water: 0, golden: false, boost: 1 };
 }
@@ -31,6 +34,8 @@ export function newGame(): GameState {
     milestones: [],
     nextEventAt: Date.now() + 90_000,
     growthBoostUntil: 0,
+    combo: 0,
+    comboUntil: 0,
     savedAt: Date.now(),
   };
 }
@@ -125,15 +130,23 @@ export function sellValueOf(s: GameState, plant: PlantId, golden: boolean, date 
   return Math.round(base * (golden ? 2 : 1));
 }
 
+/**
+ * Harvest a mature plant. Consecutive harvests within COMBO_WINDOW_MS build a
+ * streak: every 3rd harvest in a row earns a bonus (25% per 3, capped at +100%).
+ */
 export function harvest(
   s: GameState,
   index: number,
   date = todayStr(),
-): { state?: GameState; earned?: number; golden?: boolean; error?: string } {
+  now = Date.now(),
+): { state?: GameState; earned?: number; golden?: boolean; combo?: number; bonus?: number; error?: string } {
   const p = s.plots[index];
   if (!p.plant) return { error: "這裡沒有植物" };
   if (!isMature(p)) return { error: "還沒成熟，再澆點水等等它 🌱" };
-  const earned = Math.round(sellValueOf(s, p.plant, p.golden, date) * p.boost);
+  const base = Math.round(sellValueOf(s, p.plant, p.golden, date) * p.boost);
+  const combo = now <= s.comboUntil ? s.combo + 1 : 1;
+  const bonus = combo >= 3 ? Math.round(base * 0.25 * Math.min(combo / 3, 4)) : 0;
+  const earned = base + bonus;
   const plots = s.plots.slice();
   plots[index] = { ...createPlot(index) };
   return {
@@ -143,8 +156,12 @@ export function harvest(
       plots,
       totalHarvested: s.totalHarvested + 1,
       totalEarned: s.totalEarned + earned,
+      combo,
+      comboUntil: now + COMBO_WINDOW_MS,
     },
     earned,
+    bonus,
+    combo,
     golden: p.golden,
   };
 }
@@ -152,8 +169,9 @@ export function harvest(
 /**
  * Roll a random event when due. Returns the new state and an optional
  * toast message. Events: bee (a mature plant gets a one-time +50% harvest),
+ * caterpillar (eats 25% of a random growing plant's progress),
  * shower (all growing plants get refilled), rainbow (+30% growth for 60s).
- * ~35% of rolls are calm. Always reschedules the next roll 60-180s out.
+ * 30% of rolls are calm. Always reschedules the next roll 60-180s out.
  */
 export function tickEvents(
   s: GameState,
@@ -162,9 +180,9 @@ export function tickEvents(
 ): { state: GameState; msg: string | null } {
   if (now < s.nextEventAt) return { state: s, msg: null };
   const next = now + 60_000 + rnd() * 120_000;
-  if (rnd() < 0.35) return { state: { ...s, nextEventAt: next }, msg: null };
+  if (rnd() < 0.3) return { state: { ...s, nextEventAt: next }, msg: null };
   const r = rnd();
-  if (r < 0.4) {
+  if (r < 0.3) {
     const mature = s.plots.map((p, i) => ({ p, i })).filter(({ p }) => isMature(p));
     if (mature.length === 0) return { state: { ...s, nextEventAt: next }, msg: null };
     const pick = mature[Math.floor(rnd() * mature.length)];
@@ -172,7 +190,15 @@ export function tickEvents(
     plots[pick.i] = { ...pick.p, boost: 1.5 };
     return { state: { ...s, plots, nextEventAt: next }, msg: "🐝 蜜蜂來採蜜了！標記的花收獲 +50%" };
   }
-  if (r < 0.7) {
+  if (r < 0.55) {
+    const growing = s.plots.map((p, i) => ({ p, i })).filter(({ p }) => p.plant && p.progress < 1);
+    if (growing.length === 0) return { state: { ...s, nextEventAt: next }, msg: null };
+    const pick = growing[Math.floor(rnd() * growing.length)];
+    const plots = s.plots.slice();
+    plots[pick.i] = { ...pick.p, progress: Math.max(0, pick.p.progress - 0.25) };
+    return { state: { ...s, plots, nextEventAt: next }, msg: "🐛 毛毛蟲來啃食！一株植物的進度被吃掉 25%" };
+  }
+  if (r < 0.8) {
     const plots = s.plots.map((p) =>
       p.plant && p.progress < 1 && !PLANTS[p.plant].noWater ? { ...p, water: 1 } : p,
     );

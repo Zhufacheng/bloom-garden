@@ -19,6 +19,9 @@ const BUD_COLORS: Record<PlantId, string> = {
   sunflower: "#ffc107",
   hyacinth: "#90caf9",
   rose: "#ec407a",
+  lotus: "#f48fb1",
+  cherry: "#f8bbd0",
+  rainbowflower: "#b39ddb",
 };
 
 function Seed() {
@@ -247,6 +250,74 @@ function RoseBloom() {
   );
 }
 
+function LotusBloom() {
+  const angles = [-54, -36, -18, 0, 18, 36, 54];
+  return (
+    <g>
+      <ellipse cx="32" cy="51.5" rx="18" ry="5.5" fill="#81c784" />
+      <ellipse cx="20" cy="50.5" rx="6" ry="2.2" fill="#a5d6a7" />
+      <ellipse cx="44" cy="52" rx="5" ry="2" fill="#a5d6a7" />
+      <path d="M32 50 C32 44 32 38 32 32" stroke="#558b2f" strokeWidth="3" fill="none" strokeLinecap="round" />
+      {angles.map((a, i) => (
+        <ellipse
+          key={a}
+          cx="32"
+          cy="19.5"
+          rx="4.6"
+          ry="12"
+          fill={i % 2 === 0 ? "#f48fb1" : "#f8bbd0"}
+          stroke="#ec6f9c"
+          strokeWidth="0.5"
+          transform={`rotate(${a} 32 30)`}
+        />
+      ))}
+      <circle cx="32" cy="27" r="3.2" fill="#ffca28" />
+    </g>
+  );
+}
+
+function CherryBloom() {
+  const angles = [0, 72, 144, 216, 288];
+  return (
+    <g>
+      <FlowerStem />
+      <g transform="translate(32 22)">
+        {angles.map((a) => (
+          <circle key={a} cx="0" cy="-6" r="5.5" fill="#f8bbd0" stroke="#f48fb1" strokeWidth="0.5" transform={`rotate(${a})`} />
+        ))}
+        <circle cx="0" cy="0" r="3" fill="#f48fb1" />
+        {angles.map((a) => (
+          <circle key={`s${a}`} cx="0" cy="-3.4" r="1" fill="#ffd54f" transform={`rotate(${a + 36})`} />
+        ))}
+      </g>
+    </g>
+  );
+}
+
+function RainbowFlowerBloom() {
+  const colors = ["#ef5350", "#ffa726", "#ffee58", "#66bb6a", "#42a5f5", "#7e57c2", "#ec407a", "#26c6da"];
+  const angles = Array.from({ length: 8 }, (_, i) => i * 45);
+  return (
+    <g>
+      <FlowerStem />
+      {angles.map((a, i) => (
+        <ellipse
+          key={a}
+          cx="32"
+          cy="14.5"
+          rx="4.2"
+          ry="9"
+          fill={colors[i]}
+          stroke="rgba(0,0,0,0.08)"
+          strokeWidth="0.5"
+          transform={`rotate(${a} 32 26)`}
+        />
+      ))}
+      <circle cx="32" cy="26" r="5" fill="#ffffff" stroke="#e0e0e0" strokeWidth="0.8" />
+    </g>
+  );
+}
+
 export default function PlantSprite({ plant, stage, className }: { plant: PlantId; stage: Stage; className?: string }) {
   let content: React.ReactNode;
   if (stage === "seed") content = <Seed />;
@@ -260,6 +331,9 @@ export default function PlantSprite({ plant, stage, className }: { plant: PlantI
   else if (plant === "lavender") content = <LavenderBloom />;
   else if (plant === "sunflower") content = <SunflowerBloom />;
   else if (plant === "hyacinth") content = <HyacinthBloom />;
+  else if (plant === "lotus") content = <LotusBloom />;
+  else if (plant === "cherry") content = <CherryBloom />;
+  else if (plant === "rainbowflower") content = <RainbowFlowerBloom />;
   else content = <RoseBloom />;
 
   return (
