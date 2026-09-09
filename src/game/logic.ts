@@ -29,6 +29,12 @@ export const PREMIUM_IDS: PlantId[] = ["sunflower", "hyacinth", "rose", "lotus",
 /** price of one premium (golden) blind box seed */
 export const PREMIUM_COST = 50;
 
+/** totalEarned needed for the first dew; dew = floor(sqrt(totalEarned / PRESTIGE_BASE)) */
+export const PRESTIGE_BASE = 200;
+
+/** permanent sell-value bonus per dew (5% each, additive) */
+export const DEW_SELL_BONUS = 0.05;
+
 export function createPlot(id: number): Plot {
   return { id, plant: null, progress: 0, water: 0, golden: false, boost: 1 };
 }
@@ -50,12 +56,19 @@ export function newGame(): GameState {
     comboUntil: 0,
     lastCheckIn: "",
     checkInStreak: 0,
+    dew: 0,
+    coinBoostUntil: 0,
     savedAt: Date.now(),
   };
 }
 
 export function isMature(p: Plot): boolean {
   return p.plant !== null && p.progress >= 1;
+}
+
+/** chance a plant turns golden on maturity; clover decoration raises it to 15% */
+export function goldenChanceOf(s: GameState): number {
+  return s.decorations.clover ? 0.15 : GOLDEN_CHANCE;
 }
 
 export function isUnlocked(s: GameState, index: number): boolean {
@@ -74,6 +87,7 @@ export function stepState(s: GameState, dt: number, speed = 1): GameState {
   const fountain = s.decorations.fountain;
   const rate = DRAIN_RATES[s.weather] * (fountain ? 0.75 : 1);
   const refill = REFILL_RATES[s.weather] + (s.decorations.sprinkler ? SPRINKLER_RATE : 0);
+  const goldenChance = goldenChanceOf(s);
   let changed = false;
   const plots = s.plots.map((p) => {
     if (!p.plant) return p;
@@ -90,7 +104,7 @@ export function stepState(s: GameState, dt: number, speed = 1): GameState {
     if (progress === p.progress && water === p.water) return p;
     changed = true;
     const justMatured = p.progress < 1 && progress >= 1;
-    return { ...p, progress, water, golden: justMatured ? Math.random() < GOLDEN_CHANCE : p.golden };
+    return { ...p, progress, water, golden: justMatured ? Math.random() < goldenChance : p.golden };
   });
   if (!changed) return s;
   return { ...s, plots, savedAt: Date.now() };
@@ -151,9 +165,10 @@ export function plantSeed(s: GameState, index: number, plant: PlantId): { state?
   return { state: { ...s, plots, seeds: { ...s.seeds, [plant]: s.seeds[plant] - 1 } } };
 }
 
-/** Sell price today: base value x daily market x butterfly, doubled if golden. */
+/** Sell price today: base x daily market x dew bonus x butterfly, doubled if golden. */
 export function sellValueOf(s: GameState, plant: PlantId, golden: boolean, date = todayStr()): number {
-  const base = PLANTS[plant].sellValue * marketMult(plant, date) * (s.decorations.butterfly ? 1.1 : 1);
+  const dewMult = 1 + s.dew * DEW_SELL_BONUS;
+  const base = PLANTS[plant].sellValue * marketMult(plant, date) * dewMult * (s.decorations.butterfly ? 1.1 : 1);
   return Math.round(base * (golden ? 2 : 1));
 }
 
@@ -170,7 +185,8 @@ export function harvest(
   const p = s.plots[index];
   if (!p.plant) return { error: "這裡沒有植物" };
   if (!isMature(p)) return { error: "還沒成熟，再澆點水等等它 🌱" };
-  const base = Math.round(sellValueOf(s, p.plant, p.golden, date) * p.boost);
+  const coinBoost = now < s.coinBoostUntil ? 2 : 1; // golden hour
+  const base = Math.round(sellValueOf(s, p.plant, p.golden, date) * p.boost * coinBoost);
   const combo = now <= s.comboUntil ? s.combo + 1 : 1;
   const bonus = combo >= 3 ? Math.round(base * 0.25 * Math.min(combo / 3, 4)) : 0;
   const earned = base + bonus;
@@ -197,8 +213,9 @@ export function harvest(
  * Roll a random event when due. Returns the new state and an optional
  * toast message. Events: bee (a mature plant gets a one-time +50% harvest),
  * caterpillar (eats 25% of a random growing plant's progress),
- * shower (all growing plants get refilled), rainbow (+30% growth for 60s).
- * 30% of rolls are calm. Always reschedules the next roll 60-180s out.
+ * shower (all growing plants get refilled), golden hour (2x harvest coins for
+ * 60s), rainbow (+30% growth for 60s). 30% of rolls are calm.
+ * Always reschedules the next roll 60-180s out.
  */
 export function tickEvents(
   s: GameState,
@@ -209,7 +226,7 @@ export function tickEvents(
   const next = now + 60_000 + rnd() * 120_000;
   if (rnd() < 0.3) return { state: { ...s, nextEventAt: next }, msg: null };
   const r = rnd();
-  if (r < 0.3) {
+  if (r < 0.25) {
     const mature = s.plots.map((p, i) => ({ p, i })).filter(({ p }) => isMature(p));
     if (mature.length === 0) return { state: { ...s, nextEventAt: next }, msg: null };
     const pick = mature[Math.floor(rnd() * mature.length)];
@@ -217,7 +234,7 @@ export function tickEvents(
     plots[pick.i] = { ...pick.p, boost: 1.5 };
     return { state: { ...s, plots, nextEventAt: next }, msg: "🐝 蜜蜂來採蜜了！標記的花收獲 +50%" };
   }
-  if (r < 0.55) {
+  if (r < 0.45) {
     if (s.decorations.scarecrow) return { state: { ...s, nextEventAt: next }, msg: null };
     const growing = s.plots.map((p, i) => ({ p, i })).filter(({ p }) => p.plant && p.progress < 1);
     if (growing.length === 0) return { state: { ...s, nextEventAt: next }, msg: null };
@@ -226,11 +243,17 @@ export function tickEvents(
     plots[pick.i] = { ...pick.p, progress: Math.max(0, pick.p.progress - 0.25) };
     return { state: { ...s, plots, nextEventAt: next }, msg: "🐛 毛毛蟲來啃食！一株植物的進度被吃掉 25%" };
   }
-  if (r < 0.8) {
+  if (r < 0.65) {
     const plots = s.plots.map((p) =>
       p.plant && p.progress < 1 && !PLANTS[p.plant].noWater ? { ...p, water: 1 } : p,
     );
     return { state: { ...s, plots, nextEventAt: next }, msg: "🌦️ 快閃雨！所有植物水分補滿" };
+  }
+  if (r < 0.85) {
+    return {
+      state: { ...s, coinBoostUntil: now + 60_000, nextEventAt: next },
+      msg: "💰 黃金時刻！60 秒內所有收獲金幣加倍",
+    };
   }
   return {
     state: { ...s, growthBoostUntil: now + 60_000, nextEventAt: next },
@@ -304,5 +327,26 @@ export function checkIn(
     reward,
     day,
     streak,
+  };
+}
+
+/** Dew earned by prestiging this run: floor(sqrt(totalEarned / PRESTIGE_BASE)). */
+export function prestigeDewGain(s: GameState): number {
+  return Math.floor(Math.sqrt(s.totalEarned / PRESTIGE_BASE));
+}
+
+/**
+ * Rebirth the garden for permanent dew. Resets coins/plots/seeds/decorations/
+ * milestones/earnings, keeps dew (plus the gain) and the check-in streak.
+ */
+export function prestige(s: GameState): { state?: GameState; dewGained?: number; error?: string } {
+  const dewGained = prestigeDewGain(s);
+  if (dewGained < 1) {
+    return { error: `累計賺 ${PRESTIGE_BASE} 金幣才能轉生（目前 ${s.totalEarned}）` };
+  }
+  const fresh = newGame();
+  return {
+    state: { ...fresh, dew: s.dew + dewGained, lastCheckIn: s.lastCheckIn, checkInStreak: s.checkInStreak },
+    dewGained,
   };
 }

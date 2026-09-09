@@ -9,10 +9,13 @@ import {
   buySeed,
   checkIn,
   claimMilestone,
+  goldenChanceOf,
   harvest,
   isUnlocked,
   newGame,
   plantSeed,
+  prestige,
+  prestigeDewGain,
   sellValueOf,
   stepState,
   tickEvents,
@@ -480,6 +483,13 @@ describe("tickEvents", () => {
     expect(r.state.growthBoostUntil).toBeGreaterThan(Date.now());
   });
 
+  it("golden hour doubles harvest coins for 60s", () => {
+    const s = due();
+    const r = tickEvents(s, Date.now(), seq(0.5, 0.5, 0.7)); // delay, event, golden hour band
+    expect(r.msg).toContain("黃金時刻");
+    expect(r.state.coinBoostUntil).toBeGreaterThan(Date.now());
+  });
+
   it("a calm roll keeps state but reschedules", () => {
     const s = due();
     const r = tickEvents(s, Date.now(), seq(0.5, 0.1)); // delay, calm
@@ -643,5 +653,60 @@ describe("buyPremiumSeed", () => {
   it("refuses when coins are short", () => {
     const r = buyPremiumSeed({ ...newGame(), coins: PREMIUM_COST - 1 });
     expect(r.error).toBeDefined();
+  });
+});
+
+describe("prestige (dew)", () => {
+  it("dew gain follows the sqrt curve", () => {
+    expect(prestigeDewGain({ ...newGame(), totalEarned: 0 })).toBe(0);
+    expect(prestigeDewGain({ ...newGame(), totalEarned: 200 })).toBe(1);
+    expect(prestigeDewGain({ ...newGame(), totalEarned: 800 })).toBe(2);
+    expect(prestigeDewGain({ ...newGame(), totalEarned: 2000 })).toBe(3);
+  });
+
+  it("refuses before the first dew", () => {
+    const r = prestige({ ...newGame(), totalEarned: 199 });
+    expect(r.error).toBeDefined();
+  });
+
+  it("resets the garden but keeps dew and check-in", () => {
+    const s = { ...newGame(), totalEarned: 800, coins: 999, lastCheckIn: "2026-09-09", checkInStreak: 3 };
+    const r = prestige(s);
+    expect(r.dewGained).toBe(2);
+    const st = r.state!;
+    expect(st.dew).toBe(2);
+    expect(st.coins).toBe(30);
+    expect(st.totalEarned).toBe(0);
+    expect(st.lastCheckIn).toBe("2026-09-09");
+    expect(st.checkInStreak).toBe(3);
+    expect(st.decorations.fountain).toBe(false);
+  });
+});
+
+describe("golden hour harvest", () => {
+  it("doubles harvest coins while active, not after", () => {
+    const s0 = matureAt(plantSeed({ ...newGame(), ...sunny }, 0, "grass")!.state!, 0);
+    const t0 = 1_000_000;
+    const base = Math.round(12 * marketMult("grass", D));
+    const boosted = harvest({ ...s0, coinBoostUntil: t0 + 60_000 }, 0, D, t0);
+    expect(boosted.earned).toBe(base * 2);
+    const plain = harvest(s0, 0, D, t0);
+    expect(plain.earned).toBe(base);
+  });
+});
+
+describe("clover (golden chance)", () => {
+  it("raises the golden chance from 10% to 15%", () => {
+    expect(goldenChanceOf(newGame())).toBe(0.1);
+    const s = { ...newGame(), decorations: { ...emptyDecorations(), clover: true } };
+    expect(goldenChanceOf(s)).toBe(0.15);
+  });
+});
+
+describe("dew sell bonus", () => {
+  it("each dew adds 5% to the sell value", () => {
+    const s = { ...newGame(), dew: 10 };
+    const m = marketMult("daisy", D);
+    expect(sellValueOf(s, "daisy", false, D)).toBe(Math.round(30 * m * 1.5)); // 1 + 10 x 0.05
   });
 });

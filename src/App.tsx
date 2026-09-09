@@ -25,6 +25,7 @@ import {
   isMature,
   isUnlocked,
   plantSeed,
+  prestige,
   stepState,
   tickEvents,
   unlockNextRow,
@@ -289,6 +290,22 @@ export default function App() {
     showToast(`📅 簽到成功！第 ${res.day} 天 +${res.reward} 金幣`);
   }, [state, showToast]);
 
+  const onPrestige = useCallback(() => {
+    const res = prestige(state);
+    if (res.error || res.dewGained === undefined) {
+      sfx.error();
+      showToast(res.error ?? "還沒賺夠，繼續種花吧");
+      return;
+    }
+    const gained = res.dewGained;
+    if (!window.confirm(`確定要轉生嗎？\n\n花園（金幣、植物、裝飾、成就）會重置，\n但可獲得 💧 ×${gained} 露珠（永久 +${gained * 5}% 賣價）。`)) return;
+    setState(res.state!);
+    setHand(null);
+    setShopOpen(false);
+    sfx.unlock();
+    showToast(`✨ 轉生成功！💧 +${res.dewGained} 露珠，賣價永久提升`);
+  }, [state, showToast]);
+
   const onBuyDeco = useCallback(
     (deco: DecoId) => {
       const res = buyDeco(state, deco);
@@ -329,6 +346,7 @@ export default function App() {
         harvested={state.totalHarvested}
         unclaimed={unclaimedCount(daily)}
         combo={Date.now() < state.comboUntil ? state.combo : 0}
+        dew={state.dew}
         soundOn={soundOn}
         onTasks={() => {
           sfx.select();
@@ -369,6 +387,7 @@ export default function App() {
           onBuyPremium={onBuyPremium}
           onBuyDeco={onBuyDeco}
           onUnlockRow={onUnlockRow}
+          onPrestige={onPrestige}
           onReset={onReset}
           onClose={() => setShopOpen(false)}
         />

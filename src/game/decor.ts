@@ -15,6 +15,7 @@ export const DECOS: DecoDef[] = [
   { id: "birdhouse", name: "鳥屋", emoji: "🐦", cost: 150, effect: "每日任務獎勵 +10 金幣" },
   { id: "sprinkler", name: "自動噴頭", emoji: "🚿", cost: 200, effect: "全天候自動補水，植物不會乾枯" },
   { id: "scarecrow", name: "驅蟲稻草人", emoji: "🦅", cost: 180, effect: "阻擋毛毛蟲事件" },
+  { id: "clover", name: "幸運草", emoji: "🍀", cost: 120, effect: "金色植物機率 10% → 15%" },
 ];
 
 export function emptyDecorations(): Record<DecoId, boolean> {
@@ -25,5 +26,6 @@ export function emptyDecorations(): Record<DecoId, boolean> {
     birdhouse: false,
     sprinkler: false,
     scarecrow: false,
+    clover: false,
   };
 }

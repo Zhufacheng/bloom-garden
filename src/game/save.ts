@@ -48,6 +48,8 @@ export function loadGame(): GameState {
       comboUntil: parsed.comboUntil ?? 0,
       lastCheckIn: parsed.lastCheckIn ?? "",
       checkInStreak: parsed.checkInStreak ?? 0,
+      dew: parsed.dew ?? 0,
+      coinBoostUntil: parsed.coinBoostUntil ?? 0,
     };
     merged.plots = merged.plots.map((p) => ({ ...p, golden: p.golden ?? false, boost: p.boost ?? 1 }));
     return tickWeather(stepState({ ...merged, savedAt: now }, dt), now);

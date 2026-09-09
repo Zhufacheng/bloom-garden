@@ -5,12 +5,13 @@ interface Props {
   harvested: number;
   unclaimed: number;
   combo: number;
+  dew: number;
   soundOn: boolean;
   onTasks: () => void;
   onToggleSound: () => void;
 }
 
-export default function TopBar({ coins, harvested, unclaimed, combo, soundOn, onTasks, onToggleSound }: Props) {
+export default function TopBar({ coins, harvested, unclaimed, combo, dew, soundOn, onTasks, onToggleSound }: Props) {
   return (
     <header className="topbar">
       <div className="title">
@@ -33,6 +34,11 @@ export default function TopBar({ coins, harvested, unclaimed, combo, soundOn, on
       </div>
       <div className="top-right">
         <div className="stat">已收獲 {harvested} 次</div>
+        {dew > 0 && (
+          <div className="dew-pill" title="露珠：每顆永久 +5% 賣價（花店裡轉生可獲得）">
+            💧 {dew}
+          </div>
+        )}
         <div className="coin-pill">
           <CoinIcon /> {coins}
         </div>

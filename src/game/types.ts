@@ -14,7 +14,7 @@ export type PlantId =
 
 export type WeatherKind = "sunny" | "hot" | "rain";
 
-export type DecoId = "fence" | "fountain" | "butterfly" | "birdhouse" | "sprinkler" | "scarecrow";
+export type DecoId = "fence" | "fountain" | "butterfly" | "birdhouse" | "sprinkler" | "scarecrow" | "clover";
 
 export interface PlantDef {
   id: PlantId;
@@ -69,6 +69,10 @@ export interface GameState {
   lastCheckIn: string;
   /** current daily check-in streak (1-based, cycles over 7) */
   checkInStreak: number;
+  /** permanent dew currency earned by prestige; each dew = +5% sell value */
+  dew: number;
+  /** epoch ms until which harvest coins are doubled (golden hour event) */
+  coinBoostUntil: number;
   /** epoch ms of last save */
   savedAt: number;
 }

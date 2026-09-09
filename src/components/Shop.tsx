@@ -1,6 +1,6 @@
 import { todayStr } from "../game/daily";
 import { DECOS } from "../game/decor";
-import { MYSTERY_COST, PREMIUM_COST } from "../game/logic";
+import { MYSTERY_COST, PREMIUM_COST, prestigeDewGain } from "../game/logic";
 import { marketMult } from "../game/market";
 import { MAX_ROWS, PLANT_LIST, ROW_COSTS } from "../game/plants";
 import type { DecoId, GameState, PlantId } from "../game/types";
@@ -16,12 +16,14 @@ interface Props {
   onBuyPremium: () => void;
   onBuyDeco: (d: DecoId) => void;
   onUnlockRow: () => void;
+  onPrestige: () => void;
   onReset: () => void;
   onClose: () => void;
 }
 
-export default function Shop({ state, selected, onBuy, onSelect, onBuyMystery, onBuyPremium, onBuyDeco, onUnlockRow, onReset, onClose }: Props) {
+export default function Shop({ state, selected, onBuy, onSelect, onBuyMystery, onBuyPremium, onBuyDeco, onUnlockRow, onPrestige, onReset, onClose }: Props) {
   const today = todayStr();
+  const dewGain = prestigeDewGain(state);
 
   return (
     <div className="sheet-overlay" onClick={onClose}>
@@ -135,6 +137,22 @@ export default function Shop({ state, selected, onBuy, onSelect, onBuyMystery, o
             </span>
           )}
         </button>
+
+        <div className="section-title">✨ 轉生（重置花園，換永久露珠）</div>
+        <div className="shop-item prestige-card">
+          <span className="icon-emoji">💧</span>
+          <span className="info">
+            <span className="name">轉生重開 <small>Prestige</small></span>
+            <span className="meta">
+              目前露珠 ×{state.dew}（每顆永久 +5% 賣價）
+              <br />
+              重置金幣／植物／裝飾／成就，保留露珠與簽到
+            </span>
+          </span>
+          <button className="buy-btn dew-btn" disabled={dewGain < 1} onClick={(e) => { e.stopPropagation(); onPrestige(); }}>
+            💧 +{dewGain}
+          </button>
+        </div>
 
         <button className="reset-btn" onClick={onReset}>
           ↺ 重新開始（清空進度）
