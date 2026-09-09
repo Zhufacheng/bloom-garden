@@ -43,6 +43,16 @@ export interface Plot {
   fertilized: boolean;
 }
 
+/** permanent dew-shop upgrades (survive prestige) */
+export interface Upgrades {
+  /** +10% growth speed for all plants */
+  soil: boolean;
+  /** +5% golden plant chance */
+  star: boolean;
+  /** +10% sell price for everything */
+  touch: boolean;
+}
+
 export interface GameState {
   coins: number;
   /** unlocked rows (grid is always COLUMNS wide) */
@@ -73,6 +83,8 @@ export interface GameState {
   checkInStreak: number;
   /** permanent dew currency earned by prestige; each dew = +5% sell value */
   dew: number;
+  /** permanent upgrades bought with dew */
+  upgrades: Upgrades;
   /** epoch ms until which harvest coins are doubled (golden hour event) */
   coinBoostUntil: number;
   /** lifetime harvest count per plant (plant book; survives prestige) */

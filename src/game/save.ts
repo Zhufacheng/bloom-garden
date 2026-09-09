@@ -49,6 +49,7 @@ export function loadGame(): GameState {
       lastCheckIn: parsed.lastCheckIn ?? "",
       checkInStreak: parsed.checkInStreak ?? 0,
       dew: parsed.dew ?? 0,
+      upgrades: { ...fresh.upgrades, ...(parsed.upgrades ?? {}) },
       coinBoostUntil: parsed.coinBoostUntil ?? 0,
       harvestCounts: { ...emptyCounts(), ...(parsed.harvestCounts ?? {}) },
       fertilizer: parsed.fertilizer ?? 0,

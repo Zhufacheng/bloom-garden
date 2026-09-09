@@ -30,7 +30,10 @@ export default function TasksSheet({ daily, game, onClaim, onClaimOrder, onClaim
         <div className="handle" />
         <div className="sheet-head">
           <h2>
-            🎯 任務與成就 <small>{today}</small>
+            🎯 任務與成就{" "}
+            <small>
+              {today} · 今天 +{daily.stats.earned} 金 · 收獲 {daily.stats.harvested} 株
+            </small>
           </h2>
           <button className="close-btn" onClick={onClose} aria-label="關閉">
             ✕

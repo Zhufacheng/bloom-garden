@@ -27,12 +27,19 @@ export interface Order {
 /** bonus paid once when every order of the day is completed */
 export const ORDER_CLEAR_BONUS = 30;
 
+/** today's in-garden totals (harvest coins + harvest count), shown in the tasks sheet */
+export interface DailyStats {
+  earned: number;
+  harvested: number;
+}
+
 export interface DailyState {
   date: string; // local YYYY-MM-DD
   tasks: DailyTask[];
   orders: Order[];
   /** the all-orders-clear bonus has been paid today */
   orderBonusClaimed: boolean;
+  stats: DailyStats;
 }
 
 export type DailyEvent =
@@ -158,17 +165,20 @@ export function rollDaily(date: string): DailyState {
     tasks: kinds.slice(0, 3).map((k) => makeTask(k, rnd)),
     orders: rollOrders(date),
     orderBonusClaimed: false,
+    stats: { earned: 0, harvested: 0 },
   };
 }
 
 export function ensureDaily(saved: DailyState | null, today: string): DailyState {
   if (saved && saved.date === today) {
-    if (saved.orders) {
-      if (saved.orderBonusClaimed !== undefined) return saved;
-      return { ...saved, orderBonusClaimed: false };
-    }
-    // old saves predate orders; backfill without touching the day's tasks
-    return { ...saved, orders: rollOrders(today), orderBonusClaimed: false };
+    if (saved.orders && saved.orderBonusClaimed !== undefined && saved.stats) return saved;
+    // backfill fields added after the save was written
+    return {
+      ...saved,
+      orders: saved.orders ?? rollOrders(today),
+      orderBonusClaimed: saved.orderBonusClaimed ?? false,
+      stats: saved.stats ?? { earned: 0, harvested: 0 },
+    };
   }
   return rollDaily(today);
 }
@@ -178,7 +188,13 @@ export function advanceDaily(d: DailyState, ev: DailyEvent): DailyState {
     t.claimed ? t : { ...t, progress: Math.min(t.target, t.progress + amount) };
   const amount = ev.type === "water" ? ev.times : ev.type === "earn" ? ev.coins : ev.plants;
   const tasks = d.tasks.map((t) => (t.id === ev.type ? bump(t, amount) : t));
-  return { ...d, tasks };
+  const stats =
+    ev.type === "earn"
+      ? { ...d.stats, earned: d.stats.earned + ev.coins }
+      : ev.type === "harvest"
+        ? { ...d.stats, harvested: d.stats.harvested + ev.plants }
+        : d.stats;
+  return { ...d, tasks, stats };
 }
 
 export function claimTask(d: DailyState, index: number): { state: DailyState; reward: number } | null {

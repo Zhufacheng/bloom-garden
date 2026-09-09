@@ -4,9 +4,11 @@ import {
   MYSTERY_COST,
   PREMIUM_COST,
   PREMIUM_IDS,
+  UPGRADES,
   buyDeco,
   buyFertilizer,
   buyMysterySeed,
+  buyUpgrade,
   buyPremiumSeed,
   buySeed,
   checkIn,
@@ -19,6 +21,7 @@ import {
   prestige,
   prestigeDewGain,
   sellValueOf,
+  emptyUpgrades,
   stepState,
   tickEvents,
   unlockNextRow,
@@ -298,8 +301,7 @@ describe("stepState growth and water", () => {
 
 describe("harvest", () => {
   it("harvests a mature plant for coins and clears the plot", () => {
-    let s = plantSeed(newGame(), 0, "grass")!.state!;
-    s = stepState(s, 20);
+    const s = matureAt(plantSeed(newGame(), 0, "grass")!.state!, 0); // no golden roll
     const expected = Math.round(12 * marketMult("grass", D));
     const r = harvest(s, 0, D);
     expect(r.earned).toBe(expected);
@@ -811,7 +813,48 @@ describe("clover (golden chance)", () => {
   it("raises the golden chance from 10% to 15%", () => {
     expect(goldenChanceOf(newGame())).toBe(0.1);
     const s = { ...newGame(), decorations: { ...emptyDecorations(), clover: true } };
-    expect(goldenChanceOf(s)).toBe(0.15);
+    expect(goldenChanceOf(s)).toBeCloseTo(0.15, 5);
+  });
+});
+
+describe("dew shop upgrades", () => {
+  it("buys with dew, once each", () => {
+    let s = { ...newGame(), dew: 12 };
+    s = buyUpgrade(s, "soil")!.state!;
+    expect(s.dew).toBe(9);
+    expect(s.upgrades.soil).toBe(true);
+    expect(buyUpgrade(s, "soil").error).toBeDefined();
+    expect(buyUpgrade({ ...newGame(), dew: 2 }, "star").error).toBeDefined();
+    expect(UPGRADES).toHaveLength(3);
+  });
+
+  it("soil speeds growth by 10%", () => {
+    const s = plantSeed({ ...newGame(), ...sunny, upgrades: { ...emptyUpgrades(), soil: true } }, 0, "grass")!.state!;
+    expect(stepState(s, 10).plots[0].progress).toBeCloseTo(0.55, 5); // 10 of 20s, x1.1
+  });
+
+  it("touch adds 10% to the sell value", () => {
+    const s = { ...newGame(), upgrades: { ...emptyUpgrades(), touch: true } };
+    const m = marketMult("daisy", D);
+    expect(sellValueOf(s, "daisy", false, D)).toBe(Math.round(30 * m * 1.1));
+  });
+
+  it("star adds 5% to the golden chance, stacking with clover", () => {
+    expect(goldenChanceOf({ ...newGame(), upgrades: { ...emptyUpgrades(), star: true } })).toBeCloseTo(0.15, 5);
+    const both = {
+      ...newGame(),
+      decorations: { ...emptyDecorations(), clover: true },
+      upgrades: { ...emptyUpgrades(), star: true },
+    };
+    expect(goldenChanceOf(both)).toBeCloseTo(0.2, 5);
+  });
+
+  it("prestige keeps the upgrades", () => {
+    const s = { ...newGame(), totalEarned: 800, upgrades: { ...emptyUpgrades(), soil: true, touch: true } };
+    const st = prestige(s).state!;
+    expect(st.upgrades.soil).toBe(true);
+    expect(st.upgrades.touch).toBe(true);
+    expect(st.upgrades.star).toBe(false);
   });
 });
 

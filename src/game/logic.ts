@@ -3,7 +3,7 @@ import { todayStr, yesterdayStr } from "./daily";
 import { marketMult } from "./market";
 import { COLUMNS, MAX_ROWS, PLANTS, PLANT_LIST, ROW_COSTS, START_ROWS, emptyCounts, emptySeeds } from "./plants";
 import { DRAIN_RATES, REFILL_RATES, rollWeather } from "./weather";
-import type { DecoId, GameState, PlantId, Plot } from "./types";
+import type { DecoId, GameState, PlantId, Plot, Upgrades } from "./types";
 
 /** one full watering lasts 40 seconds in sunny weather */
 export const WATER_DRAIN_PER_SEC = 1 / 40;
@@ -41,6 +41,17 @@ export const FERTILIZER_COST = 40;
 /** max fertilizer that can be stored in the shed */
 export const FERTILIZER_MAX = 5;
 
+/** permanent upgrades sold in the dew shop (paid with dew, survive prestige) */
+export const UPGRADES: { id: keyof Upgrades; name: string; emoji: string; cost: number; effect: string }[] = [
+  { id: "soil", name: "沃土", emoji: "🌱", cost: 3, effect: "所有植物生長速度 +10%" },
+  { id: "star", name: "星光祝福", emoji: "⭐", cost: 4, effect: "金色植物機率 +5%" },
+  { id: "touch", name: "金手指", emoji: "💰", cost: 5, effect: "所有賣價 +10%" },
+];
+
+export function emptyUpgrades(): Upgrades {
+  return { soil: false, star: false, touch: false };
+}
+
 export function createPlot(id: number): Plot {
   return { id, plant: null, progress: 0, water: 0, golden: false, boost: 1, fertilized: false };
 }
@@ -63,6 +74,7 @@ export function newGame(): GameState {
     lastCheckIn: "",
     checkInStreak: 0,
     dew: 0,
+    upgrades: emptyUpgrades(),
     coinBoostUntil: 0,
     harvestCounts: emptyCounts(),
     fertilizer: 0,
@@ -75,9 +87,9 @@ export function isMature(p: Plot): boolean {
   return p.plant !== null && p.progress >= 1;
 }
 
-/** chance a plant turns golden on maturity; clover decoration raises it to 15% */
+/** chance a plant turns golden on maturity; clover +5%, starlight upgrade +5% */
 export function goldenChanceOf(s: GameState): number {
-  return s.decorations.clover ? 0.15 : GOLDEN_CHANCE;
+  return GOLDEN_CHANCE + (s.decorations.clover ? 0.05 : 0) + (s.upgrades.star ? 0.05 : 0);
 }
 
 export function isUnlocked(s: GameState, index: number): boolean {
@@ -94,6 +106,7 @@ export function isUnlocked(s: GameState, index: number): boolean {
 export function stepState(s: GameState, dt: number, speed = 1): GameState {
   if (dt <= 0) return s;
   const fountain = s.decorations.fountain;
+  const effSpeed = speed * (s.upgrades.soil ? 1.1 : 1);
   const rate = DRAIN_RATES[s.weather] * (fountain ? 0.75 : 1);
   const refill = REFILL_RATES[s.weather] + (s.decorations.sprinkler ? SPRINKLER_RATE : 0);
   const goldenChance = goldenChanceOf(s);
@@ -104,10 +117,10 @@ export function stepState(s: GameState, dt: number, speed = 1): GameState {
     let { progress, water } = p;
     if (progress < 1) {
       const growTime = p.fertilized ? def.growTime / 2 : def.growTime;
-      const tToBloom = ((1 - progress) * growTime) / speed;
+      const tToBloom = ((1 - progress) * growTime) / effSpeed;
       const tDry = def.noWater || rate === 0 ? Infinity : water / rate;
       const tGrow = Math.min(dt, tToBloom, tDry);
-      progress = Math.min(1, progress + (tGrow / growTime) * speed);
+      progress = Math.min(1, progress + (tGrow / growTime) * effSpeed);
       if (rate > 0 && !def.noWater) water = Math.max(0, water - tGrow * rate);
     }
     if (refill > 0) water = Math.min(1, water + refill * dt);
@@ -190,10 +203,15 @@ export function buyFertilizer(s: GameState): { state?: GameState; error?: string
   return { state: { ...s, coins: s.coins - FERTILIZER_COST, fertilizer: s.fertilizer + 1 } };
 }
 
-/** Sell price today: base x daily market x dew bonus x butterfly, doubled if golden. */
+/** Sell price today: base x daily market x dew x butterfly x golden-touch, doubled if golden. */
 export function sellValueOf(s: GameState, plant: PlantId, golden: boolean, date = todayStr()): number {
   const dewMult = 1 + s.dew * DEW_SELL_BONUS;
-  const base = PLANTS[plant].sellValue * marketMult(plant, date) * dewMult * (s.decorations.butterfly ? 1.1 : 1);
+  const base =
+    PLANTS[plant].sellValue *
+    marketMult(plant, date) *
+    dewMult *
+    (s.decorations.butterfly ? 1.1 : 1) *
+    (s.upgrades.touch ? 1.1 : 1);
   return Math.round(base * (golden ? 2 : 1));
 }
 
@@ -309,6 +327,15 @@ export function unlockNextRow(s: GameState): { state?: GameState; error?: string
   return { state: { ...s, coins: s.coins - cost, rows: s.rows + 1 } };
 }
 
+/** Buy a permanent upgrade with dew. */
+export function buyUpgrade(s: GameState, id: keyof Upgrades): { state?: GameState; error?: string } {
+  const def = UPGRADES.find((u) => u.id === id);
+  if (!def) return { error: "找不到這個升級" };
+  if (s.upgrades[id]) return { error: "已經擁有這個升級了" };
+  if (s.dew < def.cost) return { error: `露珠不夠，${def.name}要 ${def.cost} 顆` };
+  return { state: { ...s, dew: s.dew - def.cost, upgrades: { ...s.upgrades, [id]: true } } };
+}
+
 /** Buy a permanent decoration. */
 export function buyDeco(s: GameState, deco: DecoId): { state?: GameState; error?: string } {
   if (s.decorations[deco]) return { error: "已經擁有了" };
@@ -411,6 +438,7 @@ export function prestige(s: GameState): { state?: GameState; dewGained?: number;
     state: {
       ...fresh,
       dew: s.dew + dewGained,
+      upgrades: s.upgrades,
       lastCheckIn: s.lastCheckIn,
       checkInStreak: s.checkInStreak,
       harvestCounts: s.harvestCounts,

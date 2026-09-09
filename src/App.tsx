@@ -18,11 +18,13 @@ import {
 } from "./game/daily";
 import { DECOS } from "./game/decor";
 import {
+  UPGRADES,
   buyDeco,
   buyFertilizer,
   buyMysterySeed,
   buyPremiumSeed,
   buySeed,
+  buyUpgrade,
   checkIn,
   claimMilestone,
   harvest,
@@ -37,7 +39,7 @@ import {
 } from "./game/logic";
 import { PLANTS } from "./game/plants";
 import { loadDaily, loadGame, resetGame, saveDaily, saveGame } from "./game/save";
-import type { DecoId, GameState, PlantId } from "./game/types";
+import type { DecoId, GameState, PlantId, Upgrades } from "./game/types";
 import { tickWeather } from "./game/weather";
 import { isMuted, setMuted, sfx } from "./sfx";
 
@@ -301,6 +303,22 @@ export default function App() {
     showToast(`🎰 高級盲盒：${PLANTS[res.plant].name}種子！點空地種下它`);
   }, [state, showToast]);
 
+  const onBuyUpgrade = useCallback(
+    (id: keyof Upgrades) => {
+      const res = buyUpgrade(state, id);
+      if (res.error) {
+        sfx.error();
+        showToast(res.error);
+        return;
+      }
+      setState(res.state!);
+      sfx.unlock();
+      const def = UPGRADES.find((u) => u.id === id)!;
+      showToast(`✨ 買下 ${def.name} ${def.emoji}！永久生效（剩 💧${res.state!.dew}）`);
+    },
+    [state, showToast]
+  );
+
   const onBuyFertilizer = useCallback(() => {
     const res = buyFertilizer(state);
     if (res.error) {
@@ -428,6 +446,7 @@ export default function App() {
           onBuyDeco={onBuyDeco}
           onUnlockRow={onUnlockRow}
           onPrestige={onPrestige}
+          onBuyUpgrade={onBuyUpgrade}
           onReset={onReset}
           onClose={() => setShopOpen(false)}
         />

@@ -93,9 +93,17 @@ describe("advanceDaily", () => {
       ],
       orders: [],
       orderBonusClaimed: false,
+      stats: { earned: 0, harvested: 0 },
     };
     const after = advanceDaily(state, { type: "earn", coins: 40 });
     expect(after.tasks[0].progress).toBe(50);
+  });
+
+  it("stats track coins earned and plants harvested today", () => {
+    let cur = advanceDaily(rollDaily("2026-09-08"), { type: "earn", coins: 40 });
+    cur = advanceDaily(cur, { type: "harvest", plants: 3 });
+    cur = advanceDaily(cur, { type: "water", times: 2 });
+    expect(cur.stats).toEqual({ earned: 40, harvested: 3 });
   });
 });
 
@@ -177,6 +185,7 @@ describe("orders", () => {
     const migrated = ensureDaily(legacy, "2026-09-08");
     expect(migrated.tasks).toBe(fresh.tasks);
     expect(migrated.orders).toEqual(fresh.orders);
+    expect(migrated.stats).toEqual({ earned: 0, harvested: 0 });
     expect(ensureDaily(fresh, "2026-09-08")).toBe(fresh);
   });
 });
@@ -204,6 +213,7 @@ describe("claimTask / unclaimedCount / allClaimed", () => {
       ],
       orders: [],
       orderBonusClaimed: false,
+      stats: { earned: 0, harvested: 0 },
     };
     expect(unclaimedCount(state)).toBe(1);
     const res = claimTask(state, 0)!;
@@ -220,6 +230,7 @@ describe("claimTask / unclaimedCount / allClaimed", () => {
       ],
       orders: [],
       orderBonusClaimed: false,
+      stats: { earned: 0, harvested: 0 },
     };
     expect(allClaimed(base)).toBe(false);
     expect(allClaimed(claimTask(base, 0)!.state)).toBe(true);

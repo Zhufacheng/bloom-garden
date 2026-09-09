@@ -1,9 +1,16 @@
 import { todayStr, tomorrowStr } from "../game/daily";
 import { DECOS } from "../game/decor";
-import { FERTILIZER_COST, FERTILIZER_MAX, MYSTERY_COST, PREMIUM_COST, prestigeDewGain } from "../game/logic";
+import {
+  FERTILIZER_COST,
+  FERTILIZER_MAX,
+  MYSTERY_COST,
+  PREMIUM_COST,
+  UPGRADES,
+  prestigeDewGain,
+} from "../game/logic";
 import { marketMult } from "../game/market";
 import { MAX_ROWS, PLANT_LIST, ROW_COSTS } from "../game/plants";
-import type { DecoId, GameState, PlantId } from "../game/types";
+import type { DecoId, GameState, PlantId, Upgrades } from "../game/types";
 import { CoinIcon } from "./Icons";
 import PlantSprite from "./PlantSprite";
 
@@ -18,11 +25,12 @@ interface Props {
   onBuyDeco: (d: DecoId) => void;
   onUnlockRow: () => void;
   onPrestige: () => void;
+  onBuyUpgrade: (id: keyof Upgrades) => void;
   onReset: () => void;
   onClose: () => void;
 }
 
-export default function Shop({ state, selected, onBuy, onSelect, onBuyMystery, onBuyPremium, onBuyFertilizer, onBuyDeco, onUnlockRow, onPrestige, onReset, onClose }: Props) {
+export default function Shop({ state, selected, onBuy, onSelect, onBuyMystery, onBuyPremium, onBuyFertilizer, onBuyDeco, onUnlockRow, onPrestige, onBuyUpgrade, onReset, onClose }: Props) {
   const today = todayStr();
   const tomorrow = tomorrowStr();
   const dewGain = prestigeDewGain(state);
@@ -183,6 +191,28 @@ export default function Shop({ state, selected, onBuy, onSelect, onBuyMystery, o
             💧 +{dewGain}
           </button>
         </div>
+
+        <div className="section-title">💎 露珠商店（永久升級，轉生不清空）</div>
+        {UPGRADES.map((u) => {
+          const owned = state.upgrades[u.id];
+          return (
+            <div
+              key={u.id}
+              className={`shop-item${owned ? " selected" : ""}`}
+              onClick={owned ? undefined : () => onBuyUpgrade(u.id)}
+            >
+              <span className="icon-emoji">{u.emoji}</span>
+              <span className="info">
+                <span className="name">
+                  {u.name}
+                  {owned && <small> ✓ 已擁有</small>}
+                </span>
+                <span className="meta">{u.effect}</span>
+              </span>
+              {!owned && <span className="price">💧 {u.cost}</span>}
+            </div>
+          );
+        })}
 
         <button className="reset-btn" onClick={onReset}>
           ↺ 重新開始（清空進度）
