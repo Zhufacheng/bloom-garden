@@ -1,8 +1,9 @@
-import { DECOS } from "../game/decor";
-import { COLUMNS, MAX_ROWS, ROW_COSTS } from "../game/plants";
+import { useRef } from "react";
+import * as THREE from "three";
+import { COLUMNS, ROW_COSTS } from "../game/plants";
 import { WEATHER_META } from "../game/weather";
 import type { GameState } from "../game/types";
-import Plot from "./Plot";
+import GardenScene from "../three/GardenScene";
 
 interface Floater {
   index: number;
@@ -19,16 +20,27 @@ interface Props {
 }
 
 export default function Garden({ state, canPlant, floater, onPlotTap }: Props) {
-  const total = COLUMNS * MAX_ROWS;
-  const nextRowCost = state.rows < MAX_ROWS ? ROW_COSTS[state.rows + 1] : undefined;
   const wx = WEATHER_META[state.weather];
-  const ownedDecos = DECOS.filter((d) => state.decorations[d.id]);
+  const worldRef = useRef<THREE.Group>(null);
+  const drag = useRef<{ x: number; rot: number } | null>(null);
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    drag.current = { x: e.clientX, rot: worldRef.current?.rotation.y ?? 0 };
+  };
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (!drag.current || !worldRef.current) return;
+    const rot = drag.current.rot + (e.clientX - drag.current.x) * 0.005;
+    worldRef.current.rotation.y = Math.max(-0.65, Math.min(0.65, rot));
+  };
+  const endDrag = () => {
+    drag.current = null;
+  };
 
   return (
-    <div className={`garden-card wx-${state.weather}${state.decorations.fence ? " has-fence" : ""}`}>
+    <div className="garden-card">
       <div className="garden-head">
         <span>
-          🌻 我的花園 <span className="garden-sub">{state.rows}×{COLUMNS}</span>
+          🌻 我的花園 3D <span className="garden-sub">{state.rows}×{COLUMNS}</span>
         </span>
         <span className="head-chips">
           {Date.now() < state.coinBoostUntil && <span className="weather-chip gold-chip">💰 金幣加倍中</span>}
@@ -38,31 +50,23 @@ export default function Garden({ state, canPlant, floater, onPlotTap }: Props) {
           </span>
         </span>
       </div>
-      {ownedDecos.length > 0 && (
-        <div className="deco-row">
-          {ownedDecos.map((d) => (
-            <span key={d.id} title={`${d.name}：${d.effect}`}>
-              {d.emoji}
-            </span>
-          ))}
-        </div>
-      )}
-      <div className="garden-grid">
-        {Array.from({ length: total }, (_, i) => {
-          const locked = i >= state.rows * COLUMNS;
-          return (
-            <Plot
-              key={i}
-              index={i}
-              plot={state.plots[i]}
-              locked={locked}
-              lockCost={locked ? nextRowCost : undefined}
-              canPlant={canPlant}
-              floater={floater && floater.index === i ? { amount: floater.amount, key: floater.key, golden: floater.golden } : null}
-              onTap={() => onPlotTap(i)}
-            />
-          );
-        })}
+      <div
+        className="garden3d"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerLeave={endDrag}
+      >
+        <GardenScene state={state} canPlant={canPlant} onPlotTap={onPlotTap} worldRef={worldRef} />
+        {floater && (
+          <span key={floater.key} className="coin-float-2d">
+            +{floater.amount}
+            {floater.golden ? "✨" : ""} 金幣
+          </span>
+        )}
+      </div>
+      <div className="garden-hint">
+        點植物＝澆水／收獲 · 點空地＝種植 · 左右拖曳旋轉視角{state.rows < 5 ? ` · 點鎖頭擴充（${ROW_COSTS[state.rows + 1]} 金）` : ""}
       </div>
     </div>
   );

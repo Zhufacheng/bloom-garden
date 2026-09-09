@@ -9,7 +9,7 @@ export function stageOf(progress: number): Stage {
   return "bloom";
 }
 
-const BUD_COLORS: Record<PlantId, string> = {
+export const BUD_COLORS: Record<PlantId, string> = {
   grass: "#66bb6a",
   daisy: "#fafafa",
   daffodil: "#ffd54f",

@@ -181,6 +181,8 @@ button {
 
 .garden-card {
   position: relative;
+  display: flex;
+  flex-direction: column;
   background: linear-gradient(180deg, #aed581 0%, #9ccc65 100%);
   border-radius: 24px;
   padding: 14px 14px 16px;
@@ -1242,4 +1244,52 @@ button {
   padding: 1px 4px;
   line-height: 1.2;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+/* ---------- 3D garden ---------- */
+
+.garden3d {
+  position: relative;
+  flex: 1;
+  min-height: 340px;
+  touch-action: none;
+}
+
+.garden3d canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.coin-float-2d {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(38, 50, 56, 0.9);
+  color: #ffe082;
+  font-weight: 800;
+  font-size: 15px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  pointer-events: none;
+  animation: coinFloat 1.1s ease-out forwards;
+}
+
+@keyframes coinFloat {
+  from {
+    opacity: 1;
+    transform: translate(-50%, 6px);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -26px);
+  }
+}
+
+.garden-hint {
+  padding: 6px 14px calc(10px + env(safe-area-inset-bottom));
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-soft);
 }
