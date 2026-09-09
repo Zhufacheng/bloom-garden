@@ -13,8 +13,17 @@ export const DECOS: DecoDef[] = [
   { id: "fountain", name: "小噴泉", emoji: "⛲", cost: 60, effect: "水分流失變慢 25%" },
   { id: "butterfly", name: "蝴蝶園", emoji: "🦋", cost: 90, effect: "植物賣出價格 +10%" },
   { id: "birdhouse", name: "鳥屋", emoji: "🐦", cost: 150, effect: "每日任務獎勵 +10 金幣" },
+  { id: "sprinkler", name: "自動噴頭", emoji: "🚿", cost: 200, effect: "全天候自動補水，植物不會乾枯" },
+  { id: "scarecrow", name: "驅蟲稻草人", emoji: "🦅", cost: 180, effect: "阻擋毛毛蟲事件" },
 ];
 
 export function emptyDecorations(): Record<DecoId, boolean> {
-  return { fence: false, fountain: false, butterfly: false, birdhouse: false };
+  return {
+    fence: false,
+    fountain: false,
+    butterfly: false,
+    birdhouse: false,
+    sprinkler: false,
+    scarecrow: false,
+  };
 }

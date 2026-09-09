@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   MYSTERY_COST,
+  PREMIUM_COST,
+  PREMIUM_IDS,
   buyDeco,
   buyMysterySeed,
+  buyPremiumSeed,
   buySeed,
+  checkIn,
   claimMilestone,
   harvest,
   isUnlocked,
@@ -447,6 +451,19 @@ describe("tickEvents", () => {
     expect(r.state.nextEventAt).toBeGreaterThan(Date.now());
   });
 
+  it("scarecrow blocks the caterpillar event", () => {
+    let s = due();
+    s = plantSeed(s, 0, "grass")!.state!;
+    s = {
+      ...s,
+      decorations: { ...emptyDecorations(), scarecrow: true },
+      plots: s.plots.map((p, i) => (i === 0 ? { ...p, progress: 0.5 } : p)),
+    };
+    const r = tickEvents(s, Date.now(), seq(0.5, 0.5, 0.4, 0)); // caterpillar band
+    expect(r.msg).toBeNull();
+    expect(r.state.plots[0].progress).toBe(0.5); // untouched
+  });
+
   it("bee boosts one mature plot by 1.5x", () => {
     let s = due();
     s = plantSeed(s, 0, "grass")!.state!;
@@ -537,5 +554,94 @@ describe("plant catalog", () => {
     expect(s.seeds.lotus).toBe(1);
     expect(s.seeds.cherry).toBe(1);
     expect(s.seeds.rainbowflower).toBe(1);
+  });
+});
+
+describe("checkIn", () => {
+  it("first check-in grants the day 1 reward", () => {
+    const s = newGame();
+    const r = checkIn(s, "2026-09-09", "2026-09-08");
+    expect(r.streak).toBe(1);
+    expect(r.day).toBe(1);
+    expect(r.reward).toBe(10);
+    expect(r.state!.coins).toBe(40);
+    expect(r.state!.lastCheckIn).toBe("2026-09-09");
+    expect(r.state!.checkInStreak).toBe(1);
+  });
+
+  it("consecutive days build the streak", () => {
+    let s = newGame();
+    s = checkIn(s, "2026-09-08", "2026-09-07")!.state!;
+    const r = checkIn(s, "2026-09-09", "2026-09-08");
+    expect(r.streak).toBe(2);
+    expect(r.reward).toBe(15);
+  });
+
+  it("a missed day resets the streak", () => {
+    let s = newGame();
+    s = checkIn(s, "2026-09-01", "2026-08-31")!.state!;
+    const r = checkIn(s, "2026-09-09", "2026-09-08");
+    expect(r.streak).toBe(1);
+    expect(r.day).toBe(1);
+  });
+
+  it("refuses a second check-in on the same day", () => {
+    const s = { ...newGame(), lastCheckIn: "2026-09-09" };
+    const r = checkIn(s, "2026-09-09", "2026-09-08");
+    expect(r.error).toBeDefined();
+  });
+
+  it("day 7 pays the big reward, then the cycle restarts", () => {
+    let s = { ...newGame(), lastCheckIn: "2026-09-06", checkInStreak: 6 };
+    const r7 = checkIn(s, "2026-09-07", "2026-09-06");
+    expect(r7.day).toBe(7);
+    expect(r7.reward).toBe(100);
+    s = r7.state!;
+    const r8 = checkIn(s, "2026-09-08", "2026-09-07");
+    expect(r8.streak).toBe(8);
+    expect(r8.day).toBe(1);
+    expect(r8.reward).toBe(10);
+  });
+});
+
+describe("sprinkler (auto water)", () => {
+  it("keeps water topped up even in hot weather", () => {
+    const s = plantSeed(
+      { ...newGame(), ...sunny, weather: "hot" as const, decorations: { ...emptyDecorations(), sprinkler: true } },
+      0,
+      "grass",
+    )!.state!;
+    const after = stepState(s, 40);
+    expect(after.plots[0].water).toBe(1);
+    expect(after.plots[0].progress).toBe(1);
+  });
+
+  it("without a sprinkler, hot weather dries the plant", () => {
+    const s = plantSeed({ ...newGame(), ...sunny, weather: "hot" as const }, 0, "grass")!.state!;
+    const after = stepState(s, 20);
+    expect(after.plots[0].water).toBe(0);
+  });
+});
+
+describe("buyPremiumSeed", () => {
+  it("only rolls the six premium plants", () => {
+    const s = { ...newGame(), coins: 1000 };
+    for (let i = 0; i < PREMIUM_IDS.length; i++) {
+      const r = buyPremiumSeed(s, () => i / PREMIUM_IDS.length);
+      expect(PREMIUM_IDS).toContain(r.plant);
+    }
+  });
+
+  it("deducts coins and adds to the stash", () => {
+    const s = { ...newGame(), coins: 100 };
+    const r = buyPremiumSeed(s, () => 0);
+    expect(r.plant).toBe("sunflower"); // PREMIUM_IDS[0]
+    expect(r.state!.seeds.sunflower).toBe(1);
+    expect(r.state!.coins).toBe(100 - PREMIUM_COST);
+  });
+
+  it("refuses when coins are short", () => {
+    const r = buyPremiumSeed({ ...newGame(), coins: PREMIUM_COST - 1 });
+    expect(r.error).toBeDefined();
   });
 });

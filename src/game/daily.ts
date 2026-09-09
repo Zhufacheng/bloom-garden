@@ -27,6 +27,12 @@ export function todayStr(now = new Date()): string {
   return `${y}-${m}-${d}`;
 }
 
+export function yesterdayStr(now = new Date()): string {
+  const d = new Date(now);
+  d.setDate(d.getDate() - 1);
+  return todayStr(d);
+}
+
 function seedFrom(s: string): number {
   let h = 2166136261;
   for (let i = 0; i < s.length; i++) {

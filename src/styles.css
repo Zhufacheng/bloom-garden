@@ -775,6 +775,22 @@ button {
   }
 }
 
+.shop-item.premium {
+  background: linear-gradient(135deg, #fff8e1, #ffecb3);
+  border-color: #ffca28;
+  animation: premiumGlow 2.4s ease-in-out infinite;
+}
+
+@keyframes premiumGlow {
+  0%,
+  100% {
+    box-shadow: 0 2px 6px rgba(255, 179, 0, 0.2);
+  }
+  50% {
+    box-shadow: 0 2px 16px rgba(255, 179, 0, 0.45);
+  }
+}
+
 .shop-item .buy-btn {
   flex: none;
   display: flex;
@@ -905,6 +921,91 @@ button {
   font-weight: 600;
   color: var(--text-soft);
   margin-left: 6px;
+}
+
+.checkin-card {
+  background: linear-gradient(135deg, #fff8e1, #fff3e0);
+  border: 1.5px solid #ffe082;
+  border-radius: 16px;
+  padding: 12px;
+  margin-bottom: 8px;
+}
+
+.checkin-track {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+
+.checkin-day {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  background: #fff;
+  border: 1px solid #ffe0b2;
+  border-radius: 10px;
+  padding: 5px 0;
+  font-size: 10px;
+  color: var(--text-soft);
+}
+
+.checkin-day b {
+  font-size: 11px;
+  color: var(--text);
+}
+
+.checkin-day.done {
+  opacity: 0.55;
+  background: #f1f8e9;
+  border-color: #c5e1a5;
+}
+
+.checkin-day.active {
+  border-color: #ff9800;
+  background: #fff3e0;
+  box-shadow: 0 0 0 2px rgba(255, 152, 0, 0.25);
+  animation: checkinPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes checkinPulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+.checkin-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: none;
+  border-radius: 999px;
+  padding: 10px;
+  font-size: 13.5px;
+  font-weight: 800;
+  cursor: pointer;
+  background: linear-gradient(180deg, #ffb74d, #ff9800);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(255, 152, 0, 0.4);
+  transition: transform 0.12s;
+}
+
+.checkin-btn:active {
+  transform: scale(0.97);
+}
+
+.checkin-done {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-soft);
+  text-align: center;
 }
 
 .task-item {

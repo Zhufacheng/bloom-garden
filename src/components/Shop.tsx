@@ -1,6 +1,6 @@
 import { todayStr } from "../game/daily";
 import { DECOS } from "../game/decor";
-import { MYSTERY_COST } from "../game/logic";
+import { MYSTERY_COST, PREMIUM_COST } from "../game/logic";
 import { marketMult } from "../game/market";
 import { MAX_ROWS, PLANT_LIST, ROW_COSTS } from "../game/plants";
 import type { DecoId, GameState, PlantId } from "../game/types";
@@ -13,13 +13,14 @@ interface Props {
   onBuy: (p: PlantId) => void;
   onSelect: (p: PlantId) => void;
   onBuyMystery: () => void;
+  onBuyPremium: () => void;
   onBuyDeco: (d: DecoId) => void;
   onUnlockRow: () => void;
   onReset: () => void;
   onClose: () => void;
 }
 
-export default function Shop({ state, selected, onBuy, onSelect, onBuyMystery, onBuyDeco, onUnlockRow, onReset, onClose }: Props) {
+export default function Shop({ state, selected, onBuy, onSelect, onBuyMystery, onBuyPremium, onBuyDeco, onUnlockRow, onReset, onClose }: Props) {
   const today = todayStr();
 
   return (
@@ -42,6 +43,16 @@ export default function Shop({ state, selected, onBuy, onSelect, onBuyMystery, o
           </span>
           <button className="buy-btn" onClick={(e) => { e.stopPropagation(); onBuyMystery(); }}>
             <CoinIcon size={13} /> {MYSTERY_COST}
+          </button>
+        </div>
+        <div className="shop-item premium" onClick={onBuyPremium}>
+          <span className="icon-emoji">🎰</span>
+          <span className="info">
+            <span className="name">高級盲盒 <small>Premium</small></span>
+            <span className="meta">保證抽出 6 種高級花之一（向日葵～彩虹花）</span>
+          </span>
+          <button className="buy-btn" onClick={(e) => { e.stopPropagation(); onBuyPremium(); }}>
+            <CoinIcon size={13} /> {PREMIUM_COST}
           </button>
         </div>
         {PLANT_LIST.map((def) => {

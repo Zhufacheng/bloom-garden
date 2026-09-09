@@ -1,5 +1,5 @@
 import { DECOS, emptyDecorations } from "./decor";
-import { todayStr } from "./daily";
+import { todayStr, yesterdayStr } from "./daily";
 import { marketMult } from "./market";
 import { COLUMNS, MAX_ROWS, PLANTS, PLANT_LIST, ROW_COSTS, START_ROWS, emptySeeds } from "./plants";
 import { DRAIN_RATES, REFILL_RATES, rollWeather } from "./weather";
@@ -16,6 +16,18 @@ export const MYSTERY_COST = 25;
 
 /** a new harvest within this window keeps the combo streak alive */
 export const COMBO_WINDOW_MS = 15_000;
+
+/** sprinkler auto-refills water this fast per second (outpaces even hot weather) */
+export const SPRINKLER_RATE = 1 / 16;
+
+/** 7-day daily check-in coin rewards (index 0 = day 1, index 6 = day 7) */
+export const CHECKIN_REWARDS = [10, 15, 20, 30, 40, 60, 100];
+
+/** the six premium plants the golden blind box can roll */
+export const PREMIUM_IDS: PlantId[] = ["sunflower", "hyacinth", "rose", "lotus", "cherry", "rainbowflower"];
+
+/** price of one premium (golden) blind box seed */
+export const PREMIUM_COST = 50;
 
 export function createPlot(id: number): Plot {
   return { id, plant: null, progress: 0, water: 0, golden: false, boost: 1 };
@@ -36,6 +48,8 @@ export function newGame(): GameState {
     growthBoostUntil: 0,
     combo: 0,
     comboUntil: 0,
+    lastCheckIn: "",
+    checkInStreak: 0,
     savedAt: Date.now(),
   };
 }
@@ -59,7 +73,7 @@ export function stepState(s: GameState, dt: number, speed = 1): GameState {
   if (dt <= 0) return s;
   const fountain = s.decorations.fountain;
   const rate = DRAIN_RATES[s.weather] * (fountain ? 0.75 : 1);
-  const refill = REFILL_RATES[s.weather];
+  const refill = REFILL_RATES[s.weather] + (s.decorations.sprinkler ? SPRINKLER_RATE : 0);
   let changed = false;
   const plots = s.plots.map((p) => {
     if (!p.plant) return p;
@@ -108,6 +122,19 @@ export function buyMysterySeed(
   const plant = PLANT_LIST[Math.floor(rnd() * PLANT_LIST.length)].id;
   return {
     state: { ...s, coins: s.coins - MYSTERY_COST, seeds: { ...s.seeds, [plant]: (s.seeds[plant] ?? 0) + 1 } },
+    plant,
+  };
+}
+
+/** Buy a premium blind box: a random plant from the six top-tier blooms only. */
+export function buyPremiumSeed(
+  s: GameState,
+  rnd: () => number = Math.random,
+): { state?: GameState; plant?: PlantId; error?: string } {
+  if (s.coins < PREMIUM_COST) return { error: `金幣不夠，高級盲盒要 ${PREMIUM_COST}` };
+  const plant = PREMIUM_IDS[Math.floor(rnd() * PREMIUM_IDS.length)];
+  return {
+    state: { ...s, coins: s.coins - PREMIUM_COST, seeds: { ...s.seeds, [plant]: (s.seeds[plant] ?? 0) + 1 } },
     plant,
   };
 }
@@ -191,6 +218,7 @@ export function tickEvents(
     return { state: { ...s, plots, nextEventAt: next }, msg: "🐝 蜜蜂來採蜜了！標記的花收獲 +50%" };
   }
   if (r < 0.55) {
+    if (s.decorations.scarecrow) return { state: { ...s, nextEventAt: next }, msg: null };
     const growing = s.plots.map((p, i) => ({ p, i })).filter(({ p }) => p.plant && p.progress < 1);
     if (growing.length === 0) return { state: { ...s, nextEventAt: next }, msg: null };
     const pick = growing[Math.floor(rnd() * growing.length)];
@@ -256,4 +284,25 @@ export function claimMilestone(s: GameState, id: string): { state?: GameState; e
   if (s.milestones.includes(id)) return { error: "已經領過了" };
   if (!m.check(s)) return { error: "還沒達成" };
   return { state: { ...s, coins: s.coins + m.reward, milestones: [...s.milestones, id] }, earned: m.reward };
+}
+
+/**
+ * Claim the once-a-day check-in reward. The streak grows by 1 when the last
+ * check-in was yesterday, otherwise it restarts at 1. Rewards cycle over 7 days.
+ */
+export function checkIn(
+  s: GameState,
+  today = todayStr(),
+  yesterday = yesterdayStr(),
+): { state?: GameState; reward?: number; day?: number; streak?: number; error?: string } {
+  if (s.lastCheckIn === today) return { error: "今天已經簽到過了" };
+  const streak = s.lastCheckIn === yesterday ? s.checkInStreak + 1 : 1;
+  const day = ((streak - 1) % 7) + 1;
+  const reward = CHECKIN_REWARDS[day - 1];
+  return {
+    state: { ...s, coins: s.coins + reward, checkInStreak: streak, lastCheckIn: today },
+    reward,
+    day,
+    streak,
+  };
 }

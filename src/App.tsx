@@ -17,7 +17,9 @@ import { DECOS } from "./game/decor";
 import {
   buyDeco,
   buyMysterySeed,
+  buyPremiumSeed,
   buySeed,
+  checkIn,
   claimMilestone,
   harvest,
   isMature,
@@ -262,6 +264,31 @@ export default function App() {
     showToast(`🎲 抽到：${PLANTS[res.plant].name}種子！點空地種下它`);
   }, [state, showToast]);
 
+  const onBuyPremium = useCallback(() => {
+    const res = buyPremiumSeed(state);
+    if (res.error || !res.plant) {
+      sfx.error();
+      showToast(res.error ?? "抽不到高級盲盒");
+      return;
+    }
+    setState(res.state!);
+    setHand(res.plant);
+    sfx.unlock();
+    showToast(`🎰 高級盲盒：${PLANTS[res.plant].name}種子！點空地種下它`);
+  }, [state, showToast]);
+
+  const onCheckIn = useCallback(() => {
+    const res = checkIn(state);
+    if (res.error) {
+      sfx.error();
+      showToast(res.error);
+      return;
+    }
+    setState(res.state!);
+    sfx.coin();
+    showToast(`📅 簽到成功！第 ${res.day} 天 +${res.reward} 金幣`);
+  }, [state, showToast]);
+
   const onBuyDeco = useCallback(
     (deco: DecoId) => {
       const res = buyDeco(state, deco);
@@ -339,6 +366,7 @@ export default function App() {
           onBuy={onBuySeed}
           onSelect={onSelectSeed}
           onBuyMystery={onBuyMystery}
+          onBuyPremium={onBuyPremium}
           onBuyDeco={onBuyDeco}
           onUnlockRow={onUnlockRow}
           onReset={onReset}
@@ -346,7 +374,14 @@ export default function App() {
         />
       )}
       {tasksOpen && (
-        <TasksSheet daily={daily} game={state} onClaim={onClaimTask} onClaimMilestone={onClaimMilestone} onClose={() => setTasksOpen(false)} />
+        <TasksSheet
+          daily={daily}
+          game={state}
+          onClaim={onClaimTask}
+          onClaimMilestone={onClaimMilestone}
+          onCheckIn={onCheckIn}
+          onClose={() => setTasksOpen(false)}
+        />
       )}
       <Toolbar
         onWater={onWaterTap}

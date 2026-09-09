@@ -14,7 +14,7 @@ export type PlantId =
 
 export type WeatherKind = "sunny" | "hot" | "rain";
 
-export type DecoId = "fence" | "fountain" | "butterfly" | "birdhouse";
+export type DecoId = "fence" | "fountain" | "butterfly" | "birdhouse" | "sprinkler" | "scarecrow";
 
 export interface PlantDef {
   id: PlantId;
@@ -65,6 +65,10 @@ export interface GameState {
   combo: number;
   /** epoch ms until which the combo streak stays alive */
   comboUntil: number;
+  /** date string (YYYY-MM-DD) of the last daily check-in, "" = never */
+  lastCheckIn: string;
+  /** current daily check-in streak (1-based, cycles over 7) */
+  checkInStreak: number;
   /** epoch ms of last save */
   savedAt: number;
 }
